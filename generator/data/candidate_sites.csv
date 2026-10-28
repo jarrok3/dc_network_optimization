@@ -1,0 +1,5 @@
+site_id,lat,lon,monthly_fixed_cost,max_stores,name
+W,37.548,126.905,18000000,120,West yard
+E,37.536,127.055,18000000,120,East yard
+N,37.612,126.972,20700000,120,North interchange
+S,37.478,127.012,16200000,120,South logistics
