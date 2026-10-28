@@ -1,0 +1,90 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toy instance · DC network redesign</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2330;--mute:#5d6778;--line:#dde1e8;--acc:#2a6fdb;--ok:#1e8a4c;--warn:#b7791f;--bad:#c0392b;--chip:#eef2fb;--river:#7fb2e5;--grid:#e8ebf0}
+@media (prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1b212b;--ink:#e6e9ef;--mute:#9aa4b5;--line:#2f3846;--acc:#6aa3ff;--ok:#4cc38a;--warn:#e5b567;--bad:#ff7b6b;--chip:#222c3d;--river:#3d6a99;--grid:#262e3a}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:20px 24px 8px;max-width:1180px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:0 0 6px}h3{font-size:15px;margin:14px 0 6px}
+.sub{color:var(--mute);margin:0}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:6px 24px;display:flex;gap:4px;flex-wrap:wrap}
+nav a{color:var(--mute);text-decoration:none;padding:5px 10px;border-radius:6px;font-size:13px}nav a:hover{background:var(--chip);color:var(--ink)}
+main{max-width:1180px;margin:0 auto;padding:8px 24px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:16px 0}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:var(--chip);color:var(--mute);margin-left:6px;vertical-align:middle}
+.tag.live{background:#e3f6ea;color:#17703c}@media (prefers-color-scheme:dark){.tag.live{background:#1d3a2b;color:#7fe0a9}}
+.grid{display:grid;gap:14px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr 1fr}}@media (max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:10px 12px}.kpi b{display:block;font-size:20px}.kpi span{color:var(--mute);font-size:12px}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child,td.l,th.l{text-align:left}th{color:var(--mute);font-weight:600;font-size:12px}
+tr.click{cursor:pointer}tr.click:hover td{background:var(--chip)}
+.scroll{overflow-x:auto}
+svg{display:block;width:100%;height:auto}.chart text{fill:var(--mute);font-size:11px}.chart .ax{stroke:var(--line)}
+.banner{padding:9px 12px;border-radius:8px;margin:10px 0;font-size:14px;border:1px solid}
+.banner.ok{background:#e8f6ee;border-color:#b4e0c7;color:#17603a}.banner.bad{background:#fdecea;border-color:#f3b8b1;color:#8f2418}.banner.warn{background:#fff6e0;border-color:#ecd59a;color:#7a5410}
+@media (prefers-color-scheme:dark){.banner.ok{background:#17301f;border-color:#2c5a3e;color:#8be0b0}.banner.bad{background:#3a1d1a;border-color:#7a3a33;color:#ffb0a6}.banner.warn{background:#352c14;border-color:#6d5a25;color:#f0cf86}}
+label{display:block;font-size:12px;color:var(--mute);margin-bottom:2px}
+select,input[type=number],input[type=text]{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+input[type=range]{width:100%}
+button{font:inherit;padding:6px 12px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mute);margin:6px 0}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12.5px}
+ul{margin:6px 0 6px 18px;padding:0}li{margin:3px 0}
+.note{color:var(--mute);font-size:13px}.pos{color:var(--ok)}.neg{color:var(--bad)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Toy instance · distribution-centre network redesign</h1>
+  <p class="sub">Two current DCs, at most 160 stores, four candidate sites. Distances from latitude/longitude with a river-bridge detour.
+  <span class="tag">precomputed</span> numbers come from <code>python run_demo.py --build</code>.
+  The <span class="tag live">live</span> panel reruns the lower-level router in this browser.</p>
+</header>
+<nav id="nav"></nav>
+<main>
+  <section id="overview"><h2>Overview <span class="tag">precomputed</span></h2><div id="kpis" class="grid g4"></div><div id="overview-text"></div></section>
+  <section id="map"><h2>Network on a map <span class="tag">precomputed</span></h2>
+    <div class="row"><div style="flex:1;min-width:260px"><label for="mapsel">Network</label><select id="mapsel"></select></div></div>
+    <div class="grid g2"><div><svg id="mapsvg" viewBox="0 0 640 600" role="img" aria-label="Map of stores, DCs and river"></svg><div class="legend" id="maplegend"></div></div><div id="mapinfo"></div></div>
+  </section>
+  <section id="sweep"><h2>Sweep over the number of DCs <span class="tag">precomputed</span></h2>
+    <p class="note">Best candidate per k by full evaluation E. Values that violate the 50–120 store-count bounds are failure cases, not results.</p>
+    <div class="grid g2"><div><svg id="sweepsvg" class="chart" viewBox="0 0 520 330"></svg></div><div class="scroll" id="sweeptable"></div></div>
+  </section>
+  <section id="gve"><h2>Cheap criterion G versus full evaluation E <span class="tag">precomputed</span></h2>
+    <p class="note">G = DC fixed cost + λ × capacitated assignment cost on road distance. E runs the lower-level router on sampled demand days.</p>
+    <div class="grid g2"><div><svg id="scatter" class="chart" viewBox="0 0 520 380"></svg><div class="legend" id="scatterlegend"></div></div><div id="gvemetrics"></div></div>
+    <h3>Visiting candidates in G order versus random order</h3>
+    <div class="grid g2"><div><svg id="curve" class="chart" viewBox="0 0 520 300"></svg></div><div id="curvenote" class="note"></div></div>
+  </section>
+  <section id="log"><h2>Evaluation log <span class="tag">precomputed</span></h2>
+    <p class="note">Every full evaluation, in the order it was made. Click a row to draw the candidate.</p>
+    <div class="scroll" style="max-height:340px;overflow-y:auto" id="logtable"></div>
+  </section>
+  <section id="compare"><h2>Baseline comparison <span class="tag">precomputed</span></h2>
+    <p class="note">Same E, same sampled days, same routing method. Held-out days reuse fleets sized on the final days.</p>
+    <div class="scroll" id="comparetable"></div><div id="avgday"></div>
+  </section>
+  <section id="live"><h2>Live lower-level solve for one DC <span class="tag live">live</span></h2>
+    <p class="note">Change the network, DC, demand day, window, stop time and vehicle limits. Routes are recomputed here by a port of <code>lower_level/solver.py</code> (<span id="parity">parity check running…</span>).</p>
+    <div class="row" id="presets"></div>
+    <div class="grid g4" id="controls"></div>
+    <div id="livebanner"></div>
+    <div class="grid g2"><div><svg id="livemap" viewBox="0 0 640 600"></svg></div><div id="liveout"></div></div>
+  </section>
+  <section id="cases"><h2>Test examples <span class="tag">precomputed</span></h2><div id="casesbody"></div></section>
+  <section id="method"><h2>Method and limits of this toy</h2><div id="methodbody"></div></section>
+</main>
+<script src="solver.js"></script>
+<script src="toy_data.js"></script>
+<script src="app.js"></script>
+</body>
+</html>

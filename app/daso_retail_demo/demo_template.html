@@ -1,0 +1,792 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Toy instance · DC network redesign</title>
+<style>
+:root{--bg:#f6f7f9;--card:#fff;--ink:#1c2330;--mute:#5d6778;--line:#dde1e8;--acc:#2a6fdb;--ok:#1e8a4c;--warn:#b7791f;--bad:#c0392b;--chip:#eef2fb;--river:#7fb2e5;--grid:#e8ebf0}
+@media (prefers-color-scheme:dark){:root{--bg:#12161d;--card:#1b212b;--ink:#e6e9ef;--mute:#9aa4b5;--line:#2f3846;--acc:#6aa3ff;--ok:#4cc38a;--warn:#e5b567;--bad:#ff7b6b;--chip:#222c3d;--river:#3d6a99;--grid:#262e3a}}
+*{box-sizing:border-box}
+body{margin:0;font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif;background:var(--bg);color:var(--ink)}
+header{padding:20px 24px 8px;max-width:1180px;margin:0 auto}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:18px;margin:0 0 6px}h3{font-size:15px;margin:14px 0 6px}
+.sub{color:var(--mute);margin:0}
+nav{position:sticky;top:0;z-index:5;background:var(--bg);border-bottom:1px solid var(--line);padding:6px 24px;display:flex;gap:4px;flex-wrap:wrap;max-width:none}
+nav a{color:var(--mute);text-decoration:none;padding:5px 10px;border-radius:6px;font-size:13px}nav a:hover{background:var(--chip);color:var(--ink)}
+main{max-width:1180px;margin:0 auto;padding:8px 24px 60px}
+section{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px 18px;margin:16px 0}
+.tag{display:inline-block;font-size:11px;padding:1px 7px;border-radius:10px;background:var(--chip);color:var(--mute);margin-left:6px;vertical-align:middle;white-space:nowrap}
+.tag.live{background:#e3f6ea;color:#17703c}@media (prefers-color-scheme:dark){.tag.live{background:#1d3a2b;color:#7fe0a9}}
+.grid{display:grid;gap:14px}.g2{grid-template-columns:1fr 1fr}.g3{grid-template-columns:repeat(3,1fr)}.g4{grid-template-columns:repeat(4,1fr)}
+@media (max-width:860px){.g2,.g3,.g4{grid-template-columns:1fr 1fr}}@media (max-width:560px){.g2,.g3,.g4{grid-template-columns:1fr}}
+.kpi{border:1px solid var(--line);border-radius:8px;padding:10px 12px}.kpi b{display:block;font-size:20px}.kpi span{color:var(--mute);font-size:12px}
+table{border-collapse:collapse;width:100%;font-size:13px}th,td{padding:5px 8px;border-bottom:1px solid var(--line);text-align:right;white-space:nowrap}
+th:first-child,td:first-child,td.l,th.l{text-align:left}th{color:var(--mute);font-weight:600;font-size:12px}
+tr.sel td{background:var(--chip)}tr.click{cursor:pointer}tr.click:hover td{background:var(--chip)}
+.scroll{overflow-x:auto}
+svg{display:block;width:100%;height:auto}.chart text{fill:var(--mute);font-size:11px}.chart .ax{stroke:var(--line)}
+.banner{padding:9px 12px;border-radius:8px;margin:10px 0;font-size:14px;border:1px solid}
+.banner.ok{background:#e8f6ee;border-color:#b4e0c7;color:#17603a}.banner.bad{background:#fdecea;border-color:#f3b8b1;color:#8f2418}.banner.warn{background:#fff6e0;border-color:#ecd59a;color:#7a5410}
+@media (prefers-color-scheme:dark){.banner.ok{background:#17301f;border-color:#2c5a3e;color:#8be0b0}.banner.bad{background:#3a1d1a;border-color:#7a3a33;color:#ffb0a6}.banner.warn{background:#352c14;border-color:#6d5a25;color:#f0cf86}}
+label{display:block;font-size:12px;color:var(--mute);margin-bottom:2px}
+select,input[type=number],input[type=text]{width:100%;padding:5px 7px;border:1px solid var(--line);border-radius:6px;background:var(--bg);color:var(--ink);font:inherit}
+input[type=range]{width:100%}
+button{font:inherit;padding:6px 12px;border-radius:7px;border:1px solid var(--line);background:var(--card);color:var(--ink);cursor:pointer}button:hover{border-color:var(--acc)}
+button.primary{background:var(--acc);border-color:var(--acc);color:#fff}
+.legend{display:flex;flex-wrap:wrap;gap:12px;font-size:12px;color:var(--mute);margin:6px 0}.legend i{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:4px;vertical-align:-1px}
+code{background:var(--chip);padding:1px 5px;border-radius:4px;font-size:12.5px}
+ul{margin:6px 0 6px 18px;padding:0}li{margin:3px 0}
+.note{color:var(--mute);font-size:13px}.pos{color:var(--ok)}.neg{color:var(--bad)}
+.row{display:flex;gap:10px;flex-wrap:wrap;align-items:center;margin:6px 0}
+</style>
+</head>
+<body>
+<header>
+  <h1>Toy instance · distribution-centre network redesign</h1>
+  <p class="sub">Two current DCs, about 250 stores, six candidate sites — the whole pipeline end to end on <b>fictional</b> data.
+  Panels tagged <span class="tag">precomputed</span> hold numbers produced by <code>python run_toy.py</code> in <code>code/</code>; panels tagged <span class="tag live">live</span> are recomputed in your browser by a JavaScript port of the lower level.</p>
+</header>
+<nav id="nav"></nav>
+<main>
+  <section id="overview"><h2>Overview <span class="tag">precomputed</span></h2><div id="kpis" class="grid g4"></div><div id="overview-text"></div></section>
+
+  <section id="map"><h2>Network on a map <span class="tag">precomputed</span></h2>
+    <div class="row"><div style="flex:1;min-width:260px"><label for="mapsel">Network</label><select id="mapsel"></select></div></div>
+    <div class="grid g2"><div><svg id="mapsvg" viewBox="0 0 640 600" role="img" aria-label="Map of stores, DCs, river and bridges"></svg><div class="legend" id="maplegend"></div></div>
+    <div><div id="mapinfo"></div></div></div>
+  </section>
+
+  <section id="sweep"><h2>Sweep over the number of DCs <span class="tag">precomputed</span></h2>
+    <p class="note">Best candidate per k by full evaluation E on the search days. Only k = 2 and k = 3 satisfy the store-count bounds for this instance; the other values are shown with the reason (a failure case, not a result).</p>
+    <div class="grid g2"><div><svg id="sweepsvg" class="chart" viewBox="0 0 520 330"></svg></div><div class="scroll" id="sweeptable"></div></div>
+  </section>
+
+  <section id="gve"><h2>Cheap criterion G versus full evaluation E <span class="tag">precomputed</span></h2>
+    <p class="note">G = DC fixed cost + λ × capacitated assignment cost on road distance. E = the full evaluation (routing on sampled demand days). Prediction quality (how well G ranks the candidates) and decision quality (what the G-best candidate loses under E) are different numbers.</p>
+    <div class="grid g2"><div><svg id="scatter" class="chart" viewBox="0 0 520 380"></svg><div class="legend" id="scatterlegend"></div></div><div id="gvemetrics"></div></div>
+    <h3>Visiting candidates in G order versus random order</h3>
+    <div class="grid g2"><div><svg id="curve" class="chart" viewBox="0 0 520 300"></svg></div><div id="curvenote" class="note"></div></div>
+  </section>
+
+  <section id="log"><h2>Evaluation log <span class="tag">precomputed</span></h2>
+    <p class="note">Every full evaluation, in the order it was made. At toy scale the whole feasible pool is evaluated (the full run uses a budgeted surrogate search). Click a row to draw the candidate.</p>
+    <div class="scroll" style="max-height:340px;overflow-y:auto" id="logtable"></div>
+  </section>
+
+  <section id="compare"><h2>Baseline comparison <span class="tag">precomputed</span></h2>
+    <p class="note">All networks are scored under the same E, the same sampled days and the same routing method. Final days size each fleet; held-out days use those fleets unchanged. Intervals: 90%, resampling days (very few days: indicative only).</p>
+    <div class="scroll" id="comparetable"></div><div id="avgday"></div>
+  </section>
+
+  <section id="live"><h2>Live lower-level solve for one DC <span class="tag live">live</span></h2>
+    <p class="note">Change the network, DC, demand day, window, stop time and vehicle limits; the routes are recomputed in your browser by a port of <code>lower_level.py</code> (same algorithm and tie-breaking; <span id="parity">parity check running…</span>).</p>
+    <div class="row" id="presets"></div>
+    <div class="grid g4" id="controls"></div>
+    <div id="livebanner"></div>
+    <div class="grid g2"><div><svg id="livemap" viewBox="0 0 640 600"></svg></div><div id="liveout"></div></div>
+  </section>
+
+  <section id="cases"><h2>Normal, boundary and failure cases <span class="tag">precomputed</span></h2><div id="casesbody"></div></section>
+
+  <section id="method"><h2>Method, checks and limits of this toy</h2><div id="methodbody"></div></section>
+</main>
+
+<script>const TOY = /*__TOY_DATA__*/null;</script>
+<script>
+// ===================================================================================
+// Solver: a line-by-line JavaScript port of code/lower_level.py.  Do not "improve" it
+// without changing the Python file too; tests/test_js_parity.js compares the two.
+// ===================================================================================
+// ==== SOLVER BEGIN ====
+const EPS = 1e-9, TOL = 1e-6;
+let BASE_PARAMS = {speed_kmh:35, stop_min:15, depart_min:300, noon_min:720, late_min:840, capacity:48, max_stops:25,
+  max_km:250, max_route_min:600, alpha:0.02, c_fuel:350, c_spot:550000, p_late:120000, p_stockout:500000, max_passes:6};
+function mkParams(o){ return Object.assign({}, BASE_PARAMS, o || {}); }
+
+class Solver {
+  constructor(D, q, P, alpha){
+    this.D = D; this.q = q; this.P = P; this.n = D.length - 1;
+    const a = (alpha === undefined || alpha === null) ? P.alpha : alpha;
+    this.budget = Math.floor(a * this.n + 1e-9);
+    this.mpk = 60.0 / P.speed_kmh; this.R = []; this.S = [];
+  }
+  ev(seq){
+    const D = this.D, q = this.q, P = this.P, mpk = this.mpk;
+    let km = 0.0, t = P.depart_min, prev = 0, load = 0.0, n12 = 0, n14 = 0;
+    for (const s of seq){
+      const leg = D[prev][s]; km += leg; t += leg * mpk;
+      if (t > P.noon_min + EPS) n12 += 1;
+      if (t > P.late_min + EPS) n14 += 1;
+      t += P.stop_min; load += q[s]; prev = s;
+    }
+    const leg = D[prev][0]; km += leg; t += leg * mpk;
+    return [km, t, load, n12, n14];
+  }
+  ok(seq, s, hard){
+    const P = this.P;
+    return s[2] <= P.capacity + EPS && seq.length <= P.max_stops && s[0] <= P.max_km + EPS &&
+      (s[1] - P.depart_min) <= P.max_route_min + EPS && (!hard || s[3] === 0);
+  }
+  savings(nodes){
+    const D = this.D, D0 = D[0];
+    const routes = new Map(), rid = new Map();
+    for (const i of nodes){ routes.set(i, [i]); rid.set(i, i); }
+    const sav = [];
+    for (let a = 0; a < nodes.length; a++){
+      const i = nodes[a];
+      for (let b = a + 1; b < nodes.length; b++){
+        const j = nodes[b]; const s = D0[i] + D0[j] - D[i][j];
+        if (s > EPS) sav.push([-s, i, j]);
+      }
+    }
+    sav.sort((x, y) => (x[0] - y[0]) || (x[1] - y[1]) || (x[2] - y[2]));
+    for (const e of sav){
+      const i = e[1], j = e[2];
+      const ri = rid.get(i), rj = rid.get(j);
+      if (ri === rj) continue;
+      const A = routes.get(ri), B = routes.get(rj);
+      let m;
+      if (A[A.length - 1] === i && B[0] === j) m = A.concat(B);
+      else if (A[0] === i && B[B.length - 1] === j) m = B.concat(A);
+      else if (A[A.length - 1] === i && B[B.length - 1] === j) m = A.concat(B.slice().reverse());
+      else if (A[0] === i && B[0] === j) m = A.slice().reverse().concat(B);
+      else continue;
+      const s = this.ev(m);
+      if (this.ok(m, s, true)){
+        routes.set(ri, m); routes.delete(rj);
+        for (const v of B) rid.set(v, ri);
+      }
+    }
+    this.R = Array.from(routes.values()).sort((a, b) => a[0] - b[0]);
+    this.S = this.R.map(r => this.ev(r));
+  }
+  twoOpt(){
+    let imp = false;
+    for (let r = 0; r < this.R.length; r++){
+      let again = true;
+      while (again){
+        again = false;
+        const seq = this.R[r], m = seq.length;
+        outer: for (let a = 0; a < m - 1; a++){
+          for (let b = a + 1; b < m; b++){
+            const nw = seq.slice(0, a).concat(seq.slice(a, b + 1).reverse(), seq.slice(b + 1));
+            const s = this.ev(nw);
+            if (this.ok(nw, s, true) && s[0] < this.S[r][0] - 1e-7){
+              this.R[r] = nw; this.S[r] = s; imp = true; again = true; break outer;
+            }
+          }
+        }
+      }
+    }
+    return imp;
+  }
+  relocate(){
+    const P = this.P, q = this.q, cf = P.c_fuel, cs = P.c_spot;
+    let imp = false, r1 = 0;
+    while (r1 < this.R.length){
+      let p = 0, deleted = false;
+      while (p < this.R[r1].length){
+        const seq1 = this.R[r1], node = seq1[p];
+        const new1 = seq1.slice(0, p).concat(seq1.slice(p + 1));
+        const s1 = new1.length ? this.ev(new1) : [0.0, 0.0, 0.0, 0, 0];
+        const old1 = this.S[r1][0];
+        let best = null, bestDelta = -TOL;
+        for (let r2 = 0; r2 < this.R.length; r2++){
+          if (r2 === r1) continue;
+          const seq2 = this.R[r2];
+          if (this.S[r2][2] + q[node] > P.capacity + EPS || seq2.length + 1 > P.max_stops) continue;
+          for (let pos = 0; pos <= seq2.length; pos++){
+            const new2 = seq2.slice(0, pos).concat([node], seq2.slice(pos));
+            const s2 = this.ev(new2);
+            if (!this.ok(new2, s2, true)) continue;
+            const delta = cf * (s1[0] + s2[0] - old1 - this.S[r2][0]) - (new1.length ? 0.0 : cs);
+            if (delta < bestDelta){ bestDelta = delta; best = [r2, new2, s2]; }
+          }
+        }
+        if (best !== null){
+          const r2 = best[0], new2 = best[1], s2 = best[2];
+          this.R[r2] = new2; this.S[r2] = s2; imp = true;
+          if (new1.length){ this.R[r1] = new1; this.S[r1] = s1; continue; }
+          this.R.splice(r1, 1); this.S.splice(r1, 1); deleted = true; break;
+        }
+        p += 1;
+      }
+      if (!deleted) r1 += 1;
+    }
+    return imp;
+  }
+  swap(){
+    const P = this.P, q = this.q, cf = P.c_fuel;
+    let imp = false;
+    for (let r1 = 0; r1 < this.R.length; r1++){
+      for (let r2 = r1 + 1; r2 < this.R.length; r2++){
+        while (true){
+          let found = false;
+          const a = this.R[r1], b = this.R[r2];
+          search: for (let x = 0; x < a.length; x++){
+            for (let y = 0; y < b.length; y++){
+              const i = a[x], j = b[y];
+              const l1 = this.S[r1][2] - q[i] + q[j], l2 = this.S[r2][2] - q[j] + q[i];
+              if (l1 > P.capacity + EPS || l2 > P.capacity + EPS) continue;
+              const n1 = a.slice(0, x).concat([j], a.slice(x + 1));
+              const e1 = this.ev(n1);
+              if (!this.ok(n1, e1, true)) continue;
+              const n2 = b.slice(0, y).concat([i], b.slice(y + 1));
+              const e2 = this.ev(n2);
+              if (!this.ok(n2, e2, true)) continue;
+              if (cf * (e1[0] + e2[0] - this.S[r1][0] - this.S[r2][0]) < -TOL){
+                this.R[r1] = n1; this.S[r1] = e1; this.R[r2] = n2; this.S[r2] = e2; found = true; break search;
+              }
+            }
+          }
+          if (!found) break;
+          imp = true;
+        }
+      }
+    }
+    return imp;
+  }
+  reinsert(r, hard, bEff){
+    const P = this.P, q = this.q, D0 = this.D[0], cf = P.c_fuel, pl = P.p_late;
+    const tmpR = [], tmpS = [];
+    for (let k = 0; k < this.R.length; k++) if (k !== r){ tmpR.push(this.R[k].slice()); tmpS.push(this.S[k]); }
+    let n12Tot = 0;
+    for (const s of this.S) n12Tot += s[3];
+    n12Tot -= this.S[r][3];
+    const nodes = this.R[r].slice().sort((u, v) => (D0[v] - D0[u]) || (u - v));
+    for (const node of nodes){
+      let best = null, bc = Infinity;
+      for (let r2 = 0; r2 < tmpR.length; r2++){
+        const seq2 = tmpR[r2];
+        if (tmpS[r2][2] + q[node] > P.capacity + EPS || seq2.length + 1 > P.max_stops) continue;
+        for (let pos = 0; pos <= seq2.length; pos++){
+          const new2 = seq2.slice(0, pos).concat([node], seq2.slice(pos));
+          const s2 = this.ev(new2);
+          if (!this.ok(new2, s2, hard)) continue;
+          const dn12 = s2[3] - tmpS[r2][3];
+          if (!hard && n12Tot + dn12 > bEff) continue;
+          const c = cf * (s2[0] - tmpS[r2][0]) + (hard ? 0.0 : pl * (s2[4] - tmpS[r2][4]));
+          if (c < bc - 1e-12){ bc = c; best = [r2, new2, s2, dn12]; }
+        }
+      }
+      if (best === null) return null;
+      tmpR[best[0]] = best[1]; tmpS[best[0]] = best[2]; n12Tot += best[3];
+    }
+    return [tmpR, tmpS];
+  }
+  eliminate(hard, bEff){
+    const P = this.P;
+    let imp = false;
+    while (true){
+      let success = false;
+      const order = this.R.map((_, k) => k).sort((a, b) => (this.R[a].length - this.R[b].length) || (a - b));
+      for (const r of order){
+        if (this.R.length <= 1) break;
+        const res = this.reinsert(r, hard, bEff);
+        if (res === null) continue;
+        const tmpR = res[0], tmpS = res[1];
+        let newKm = 0.0, oldKm = 0.0, n14New = 0, n14Old = 0;
+        for (const st of tmpS){ newKm += st[0]; n14New += st[4]; }
+        for (const st of this.S){ oldKm += st[0]; n14Old += st[4]; }
+        const delta = P.c_fuel * (newKm - oldKm) + (hard ? 0.0 : P.p_late * (n14New - n14Old)) - P.c_spot;
+        if (delta < -TOL){ this.R = tmpR; this.S = tmpS; success = true; imp = true; break; }
+      }
+      if (!success) break;
+    }
+    return imp;
+  }
+}
+
+function solo(D, P, i){
+  const mpk = 60.0 / P.speed_kmh;
+  const arr = P.depart_min + D[0][i] * mpk;
+  const ret = arr + P.stop_min + D[i][0] * mpk;
+  return [2 * D[0][i], arr, ret];
+}
+function hhmm(m){ m = Math.round(m); return String(Math.floor(m / 60) % 24).padStart(2, '0') + ':' + String(m % 60).padStart(2, '0'); }
+
+function routeDict(sv, seq, forced){
+  const P = sv.P, D = sv.D, q = sv.q;
+  let km = 0.0, t = P.depart_min, prev = 0; const arr = [];
+  for (const s of seq){ km += D[prev][s]; t += D[prev][s] * sv.mpk; arr.push(t); t += P.stop_min; prev = s; }
+  km += D[prev][0]; t += D[prev][0] * sv.mpk;
+  let load = 0.0; for (const s of seq) load += q[s];
+  return {stores: seq.slice(), km: km, load: load, return_min: t, arrivals: arr,
+    n12: arr.filter(a => a > P.noon_min + EPS).length, n14: arr.filter(a => a > P.late_min + EPS).length, forced_late: forced};
+}
+
+function solveDcDay(D, q, P, alpha){
+  const n = D.length - 1;
+  const sv = new Solver(D, q, P, alpha);
+  const unserved = [], forced = [], main = [];
+  for (let i = 1; i <= n; i++){
+    if (q[i] <= 0) continue;
+    const so = solo(D, P, i);
+    if (q[i] > P.capacity + EPS || so[0] > P.max_km + EPS || so[2] - P.depart_min > P.max_route_min + EPS) unserved.push(i);
+    else if (so[1] > P.noon_min + EPS) forced.push(i);
+    else main.push(i);
+  }
+  if (forced.length > sv.budget){
+    return {status: 'infeasible', routes: [], unserved: unserved, forced_late: forced, vehicles: 0, km: 0.0, n12: forced.length, n14: 0,
+      budget: sv.budget, n_stores: n,
+      message: forced.length + ' stores cannot be reached by ' + hhmm(P.noon_min) + ' even with a dedicated vehicle, but the noon budget allows only ' +
+        sv.budget + ' of ' + n + ' stores after noon. The service-level constraint cannot be met; no routes are produced.'};
+  }
+  if (main.length){
+    sv.savings(main);
+    for (let pass = 0; pass < P.max_passes; pass++){
+      let ch = sv.twoOpt();
+      ch = sv.relocate() || ch;
+      ch = sv.swap() || ch;
+      ch = sv.eliminate(true, 0) || ch;
+      if (!ch) break;
+    }
+    const bEff = sv.budget - forced.length;
+    if (bEff > 0) sv.eliminate(false, bEff);
+  }
+  const routes = sv.R.map(seq => routeDict(sv, seq, false));
+  for (const i of forced) routes.push(routeDict(sv, [i], true));
+  routes.sort((a, b) => a.stores[0] - b.stores[0]);
+  let km = 0, n12 = 0, n14 = 0;
+  for (const r of routes){ km += r.km; n12 += r.n12; n14 += r.n14; }
+  return {status: 'ok', message: '', routes: routes, unserved: unserved, forced_late: forced, vehicles: routes.length, km: km,
+    n12: n12, n14: n14, budget: sv.budget, n_stores: n};
+}
+
+function account(sol, P, owned, spotCap){
+  const routes = sol.routes, V = routes.length;
+  let spot = Math.max(0, V - owned);
+  let unserved = sol.unserved.slice();
+  const drop = new Set();
+  if (spotCap !== null && spotCap !== undefined && spot > spotCap){
+    const k = spot - spotCap;
+    const order = routes.map((_, i) => i).sort((a, b) => (routes[a].load - routes[b].load) || (a - b)).slice(0, k);
+    for (const r of order){ drop.add(r); unserved = unserved.concat(routes[r].stores); }
+    spot = spotCap;
+  }
+  const keep = routes.filter((_, i) => !drop.has(i));
+  let km = 0, n12 = 0, n14 = 0, delivered = 0;
+  for (const r of keep){ km += r.km; n12 += r.n12; n14 += r.n14; delivered += r.stores.length; }
+  const fuel = P.c_fuel * km, spotCost = P.c_spot * spot, failure = P.p_late * n14 + P.p_stockout * unserved.length;
+  return {vehicles_needed: V, vehicles_run: keep.length, km: km, spot: spot, n12: n12, n14: n14, delivered: delivered,
+    unserved: unserved.slice().sort((a, b) => a - b), fuel: fuel, spot_cost: spotCost, failure: failure, total: fuel + spotCost + failure};
+}
+
+// independent re-check of a solution against the formulation (returns a list of violated rules)
+function validate(sol, D, q, P, alpha){
+  const n = D.length - 1, a = (alpha === undefined || alpha === null) ? P.alpha : alpha;
+  const budget = Math.floor(a * n + 1e-9), mpk = 60.0 / P.speed_kmh, bad = [];
+  let seen = [], n12 = 0;
+  for (const r of sol.routes){
+    let t = P.depart_min, prev = 0, km = 0, load = 0;
+    for (const s of r.stores){ km += D[prev][s]; t += D[prev][s] * mpk; if (t > P.noon_min + EPS) n12++; t += P.stop_min; load += q[s]; prev = s; }
+    km += D[prev][0]; t += D[prev][0] * mpk;
+    if (load > P.capacity + 1e-6) bad.push('load');
+    if (r.stores.length > P.max_stops) bad.push('stops');
+    if (km > P.max_km + 1e-6) bad.push('km');
+    if (t - P.depart_min > P.max_route_min + 1e-6) bad.push('duration');
+    seen = seen.concat(r.stores);
+  }
+  const need = []; for (let i = 1; i <= n; i++) if (q[i] > 0) need.push(i);
+  const got = seen.concat(sol.unserved).sort((x, y) => x - y);
+  if (JSON.stringify(got) !== JSON.stringify(need)) bad.push('cover');
+  if (n12 > budget) bad.push('noon-budget');
+  return bad;
+}
+// ==== SOLVER END ====
+</script>
+
+<script>
+// ===================================================================================
+// Page: data access, charts, panels.
+// ===================================================================================
+if (TOY) { BASE_PARAMS = Object.assign({}, TOY.params); }
+const SVGNS = 'http://www.w3.org/2000/svg';
+function addKids(e, kids){ for (const k of kids.flat()){ if (k === null || k === undefined || k === false) continue; e.appendChild(typeof k === 'object' ? k : document.createTextNode(String(k))); } }
+function setAttrs(e, a){
+  for (const k in (a || {})){
+    const v = a[k]; if (v === null || v === undefined || v === false) continue;
+    if (k.slice(0, 2) === 'on') e.addEventListener(k.slice(2), v); else if (k === 'text') e.textContent = v; else e.setAttribute(k, v);
+  }
+}
+function h(tag, attrs, ...kids){ const e = document.createElement(tag); setAttrs(e, attrs); addKids(e, kids); return e; }
+function sv(tag, attrs, ...kids){ const e = document.createElementNS(SVGNS, tag); setAttrs(e, attrs); addKids(e, kids); return e; }
+function clear(e){ while (e.firstChild) e.removeChild(e.firstChild); return e; }
+const $ = id => document.getElementById(id);
+const fM = x => (x / 1e6).toFixed(1), fM2 = x => (x / 1e6).toFixed(2), fP = (x, d) => (x).toFixed(d === undefined ? 1 : d) + '%';
+const fK = x => Math.round(x).toLocaleString('en-US');
+const SITE_COL = ['#2a6fdb', '#e0702b', '#2f9e5b', '#a24fd1', '#c49a00', '#d1457a'];
+const ROUTE_COL = ['#2a6fdb', '#e0702b', '#2f9e5b', '#a24fd1', '#c49a00', '#d1457a', '#0e9aa7', '#7a5af8', '#6c8a1f', '#c0392b', '#3b4a6b', '#e08bd1'];
+const R = TOY ? TOY.results : null;
+const siteIndex = id => TOY.sites.findIndex(s => s.id === id);
+const siteById = id => TOY.sites[siteIndex(id)];
+
+// ---- distances rebuilt from the embedded upper triangle (same numbers as the Python cache)
+let DIST = null, DIDX = null;
+function buildDist(){
+  const ids = TOY.dist.ids, n = ids.length; DIDX = {}; ids.forEach((v, i) => DIDX[v] = i);
+  DIST = new Float64Array(n * n); let k = 0;
+  for (let i = 0; i < n; i++) for (let j = i + 1; j < n; j++){ const v = TOY.dist.tri[k++]; DIST[i * n + j] = v; DIST[j * n + i] = v; }
+}
+function subMatrix(ids){
+  const n = TOY.dist.ids.length, ix = ids.map(i => DIDX[i]);
+  return ix.map(a => ix.map(b => DIST[a * n + b]));
+}
+
+// ---- networks (map and live solver)
+const NETS = [];
+function buildNets(){
+  R.final.forEach(r => NETS.push({key: 'final:' + r.role, label: r.label, sites: r.sites, assign: r.assign, fleet: r.final.fleet, ev: r.final, group: 'Reference and shortlisted networks'}));
+  const b = R.cases.boundary;
+  if (b.status === 'ok') NETS.push({key: 'boundary', label: 'Boundary case: recommended sites, each DC exactly at the store-count bound', sites: b.sites, assign: b.assign, fleet: b.fleet, ev: null, group: 'Reference and shortlisted networks'});
+  R.candidates.filter(c => c.feasible).sort((a, b2) => a.G - b2.G).forEach(c =>
+    NETS.push({key: 'cand:' + c.id, label: 'Candidate ' + c.id + ' · k = ' + c.k + ' · G ' + fM(c.G) + ' M · E ' + fM(c.E) + ' M', sites: c.sites, assign: c.assign, fleet: c.eval.fleet, ev: c.eval, group: 'All feasible candidates (ascending G)'}));
+}
+function fillSelect(sel, nets, keep){
+  clear(sel); const groups = {};
+  nets.forEach(n => { (groups[n.group] = groups[n.group] || []).push(n); });
+  Object.keys(groups).forEach(g => { const og = h('optgroup', {label: g}); groups[g].forEach(n => og.appendChild(h('option', {value: n.key}, n.label))); sel.appendChild(og); });
+  if (keep) sel.value = keep;
+}
+
+// ---- map
+function projector(W, H, pad){
+  const g = TOY.geo, lat0 = (g.lat_min + g.lat_max) / 2, kx = Math.cos(lat0 * Math.PI / 180);
+  const wKm = (g.lon_max - g.lon_min) * 111 * kx, hKm = (g.lat_max - g.lat_min) * 111;
+  const sc = Math.min((W - 2 * pad) / wKm, (H - 2 * pad) / hKm);
+  return (lat, lon) => [pad + (lon - g.lon_min) * 111 * kx * sc, pad + (g.lat_max - lat) * 111 * sc];
+}
+function mapBase(svg, pr){
+  clear(svg);
+  svg.appendChild(sv('rect', {x: 0, y: 0, width: 640, height: 600, fill: 'none'}));
+  const r = TOY.geo.river, a = pr(r[0][0], r[0][1]), b = pr(r[1][0], r[1][1]);
+  svg.appendChild(sv('line', {x1: a[0], y1: a[1], x2: b[0], y2: b[1], stroke: 'var(--river)', 'stroke-width': 7, 'stroke-linecap': 'round', opacity: 0.6}));
+  TOY.geo.bridges.forEach(br => { const p = pr(br[0], br[1]); svg.appendChild(sv('rect', {x: p[0] - 6, y: p[1] - 3, width: 12, height: 6, fill: 'var(--mute)', opacity: 0.7})); });
+  svg.appendChild(sv('text', {x: a[0] + 6, y: a[1] - 10, fill: 'var(--river)', 'font-size': 12}, 'river (bridges ▬)'));
+}
+function drawNetwork(svg, net){
+  const pr = projector(640, 600, 30); mapBase(svg, pr);
+  const open = new Set(net.sites);
+  TOY.stores.forEach((s, i) => { const p = pr(s.lat, s.lon); svg.appendChild(sv('circle', {cx: p[0], cy: p[1], r: 3, fill: SITE_COL[siteIndex(net.sites[net.assign[i]])], opacity: 0.85}, sv('title', {}, s.id + ' · ' + s.type + ' · ' + s.region + ' → ' + net.sites[net.assign[i]]))); });
+  TOY.sites.forEach((s, k) => {
+    const p = pr(s.lat, s.lon);
+    if (open.has(s.id)) svg.appendChild(sv('rect', {x: p[0] - 8, y: p[1] - 8, width: 16, height: 16, fill: SITE_COL[k], stroke: 'var(--ink)', 'stroke-width': 2}));
+    else svg.appendChild(sv('rect', {x: p[0] - 6, y: p[1] - 6, width: 12, height: 12, fill: 'none', stroke: 'var(--mute)', 'stroke-width': 1.5, transform: 'rotate(45 ' + p[0] + ' ' + p[1] + ')'}));
+    svg.appendChild(sv('text', {x: p[0] + 11, y: p[1] - 9, fill: 'var(--ink)', 'font-size': 13, 'font-weight': 600}, s.id));
+  });
+}
+function renderMap(key){
+  const net = NETS.find(n => n.key === key) || NETS[0];
+  drawNetwork($('mapsvg'), net);
+  const lg = clear($('maplegend'));
+  TOY.sites.forEach((s, k) => lg.appendChild(h('span', {}, h('i', {style: 'background:' + SITE_COL[k]}), s.id + (net.sites.indexOf(s.id) >= 0 ? ' (open)' : ' (closed candidate)'))));
+  const info = clear($('mapinfo'));
+  info.appendChild(h('h3', {}, net.label));
+  const rows = net.sites.map((sid, j) => { const n = net.assign.filter(a => a === j).length, s = siteById(sid); return h('tr', {}, h('td', {}, sid + ' · ' + s.name), h('td', {}, n), h('td', {}, TOY.meta.min_stores + ' – ' + s.max), h('td', {class: (n < TOY.meta.min_stores || n > s.max) ? 'neg' : ''}, (n < TOY.meta.min_stores || n > s.max) ? 'outside bounds (baseline is exempt)' : 'within bounds'), h('td', {}, fM(s.fixed) + ' M')); });
+  info.appendChild(h('table', {}, h('tr', {}, h('th', {class: 'l'}, 'Open DC'), h('th', {}, 'Stores'), h('th', {}, 'Allowed'), h('th', {}, 'Bounds'), h('th', {}, 'Fixed / month')), rows));
+  if (net.ev && net.ev.status === 'ok'){
+    const e = net.ev;
+    info.appendChild(h('h3', {}, 'Monthly cost (sampled days)'));
+    info.appendChild(h('table', {}, [['DC fixed', e.dc_fixed], ['Vehicles (owned fleet ' + Object.values(e.fleet).reduce((a, b) => a + b, 0) + ')', e.vehicle_fixed], ['Fuel', e.fuel], ['Spot trucks', e.spot], ['Failures', e.failure], ['Total', e.total]].map(r => h('tr', {}, h('td', {}, r[0]), h('td', {}, fM(r[1]) + ' M KRW')))));
+    info.appendChild(h('p', {class: 'note'}, 'Share of deliveries before 12:00: ' + fP(100 * e.service_before_noon) + ' (worst day ' + fP(100 * e.service_min_day) + ').'));
+  }
+  info.appendChild(h('p', {class: 'note'}, 'Squares are open DCs, diamonds are closed candidate sites, dots are stores coloured by the DC that serves them.'));
+}
+
+// ---- generic chart helpers
+function ticks(lo, hi, n){
+  const span = hi - lo, raw = span / n, mag = Math.pow(10, Math.floor(Math.log10(raw))), f = raw / mag;
+  const step = (f < 1.5 ? 1 : f < 3.5 ? 2 : f < 7.5 ? 5 : 10) * mag, out = [];
+  for (let v = Math.ceil(lo / step) * step; v <= hi + 1e-9; v += step) out.push(v);
+  return out;
+}
+function axes(svg, W, H, m, xr, yr, xl, yl, xt, yt){
+  const X = v => m.l + (v - xr[0]) / (xr[1] - xr[0]) * (W - m.l - m.r), Y = v => H - m.b - (v - yr[0]) / (yr[1] - yr[0]) * (H - m.t - m.b);
+  ticks(yr[0], yr[1], yt || 5).forEach(v => { svg.appendChild(sv('line', {x1: m.l, x2: W - m.r, y1: Y(v), y2: Y(v), stroke: 'var(--grid)'})); svg.appendChild(sv('text', {x: m.l - 6, y: Y(v) + 4, 'text-anchor': 'end'}, +v.toFixed(2))); });
+  if (xt !== false) ticks(xr[0], xr[1], xt || 5).forEach(v => svg.appendChild(sv('text', {x: X(v), y: H - m.b + 14, 'text-anchor': 'middle'}, +v.toFixed(2))));
+  svg.appendChild(sv('line', {x1: m.l, x2: W - m.r, y1: H - m.b, y2: H - m.b, class: 'ax'}));
+  svg.appendChild(sv('text', {x: (m.l + W - m.r) / 2, y: H - 4, 'text-anchor': 'middle'}, xl));
+  svg.appendChild(sv('text', {x: 12, y: (m.t + H - m.b) / 2, 'text-anchor': 'middle', transform: 'rotate(-90 12 ' + ((m.t + H - m.b) / 2) + ')'}, yl));
+  return {X: X, Y: Y};
+}
+
+function renderSweep(){
+  const svg = clear($('sweepsvg')), W = 520, H = 330, m = {l: 48, r: 12, t: 16, b: 46};
+  const sw = R.sweep, comps = [['dc_fixed', 'DC fixed', '#2a6fdb'], ['vehicle_fixed', 'Vehicles', '#e0702b'], ['fuel', 'Fuel', '#2f9e5b'], ['sf', 'Spot + failures', '#c0392b']];
+  const maxV = Math.max(...sw.filter(s => s.feasible).map(s => s.e_best_eval.total)) / 1e6 * 1.12;
+  const ax = axes(svg, W, H, m, [0.5, sw.length + 0.5], [0, maxV], 'Number of open DCs k', 'M KRW / month', false);
+  const bw = (W - m.l - m.r) / sw.length * 0.6;
+  sw.forEach(s => {
+    const cx = ax.X(s.k); svg.appendChild(sv('text', {x: cx, y: H - m.b + 14, 'text-anchor': 'middle'}, 'k = ' + s.k));
+    if (!s.feasible){
+      svg.appendChild(sv('rect', {x: cx - bw / 2, y: ax.Y(maxV * 0.35), width: bw, height: ax.Y(0) - ax.Y(maxV * 0.35), fill: 'none', stroke: 'var(--bad)', 'stroke-dasharray': '4 3'}));
+      svg.appendChild(sv('text', {x: cx, y: ax.Y(maxV * 0.18), 'text-anchor': 'middle', fill: 'var(--bad)'}, 'infeasible'));
+      return;
+    }
+    const e = s.e_best_eval; let y0 = 0;
+    comps.forEach(c => {
+      const v = (c.k === undefined && c[0] === 'sf') ? (e.spot + e.failure) / 1e6 : e[c[0]] / 1e6;
+      svg.appendChild(sv('rect', {x: cx - bw / 2, y: ax.Y(y0 + v), width: bw, height: ax.Y(y0) - ax.Y(y0 + v), fill: c[2]}, sv('title', {}, c[1] + ': ' + v.toFixed(1) + ' M')));
+      y0 += v;
+    });
+    svg.appendChild(sv('text', {x: cx, y: ax.Y(y0) - 5, 'text-anchor': 'middle', style: 'fill:var(--ink);font-weight:600'}, y0.toFixed(1)));
+  });
+  comps.forEach((c, i) => { svg.appendChild(sv('rect', {x: m.l + i * 110, y: 2, width: 9, height: 9, fill: c[2]})); svg.appendChild(sv('text', {x: m.l + i * 110 + 13, y: 10}, c[1])); });
+  const t = clear($('sweeptable'));
+  t.appendChild(h('table', {}, h('tr', {}, h('th', {}, 'k'), h('th', {class: 'l'}, 'Best by E'), h('th', {}, 'E (M)'), h('th', {class: 'l'}, 'G-best'), h('th', {}, 'its E (M)')),
+    sw.map(s => s.feasible ? h('tr', {}, h('td', {}, s.k), h('td', {class: 'l'}, s.e_best), h('td', {}, fM(s.e_best_eval.total)), h('td', {class: 'l'}, s.g_best), h('td', {}, fM(s.g_best_E)))
+      : h('tr', {}, h('td', {}, s.k), h('td', {class: 'l neg', colspan: 4}, s.reason)))));
+}
+
+function renderScatter(){
+  const svg = clear($('scatter')), W = 520, H = 380, m = {l: 50, r: 14, t: 14, b: 44};
+  const cs = R.candidates.filter(c => c.feasible), g = cs.map(c => c.G / 1e6), e = cs.map(c => c.E / 1e6);
+  const lo = Math.min(...g, ...e) * 0.98, hi = Math.max(...g, ...e) * 1.02;
+  const ax = axes(svg, W, H, m, [lo, hi], [lo, hi], 'G (M KRW / month)', 'E (M KRW / month)');
+  svg.appendChild(sv('line', {x1: ax.X(lo), y1: ax.Y(lo), x2: ax.X(hi), y2: ax.Y(hi), stroke: 'var(--mute)', 'stroke-dasharray': '4 4'}));
+  const ks = [...new Set(cs.map(c => c.k))].sort(), col = k => SITE_COL[ks.indexOf(k) % 6];
+  cs.forEach(c => svg.appendChild(sv('circle', {cx: ax.X(c.G / 1e6), cy: ax.Y(c.E / 1e6), r: 4.5, fill: col(c.k), opacity: 0.8}, sv('title', {}, c.id + ' · G ' + fM(c.G) + ' · E ' + fM(c.E)))));
+  const mt = R.metrics;
+  [[mt.g_best, 'G-best', 'var(--ink)'], [mt.e_best, 'E-best', 'var(--bad)']].forEach((o, i) => {
+    const c = cs.find(x => x.id === o[0]); if (!c) return;
+    svg.appendChild(sv('circle', {cx: ax.X(c.G / 1e6), cy: ax.Y(c.E / 1e6), r: 9 + 3 * i, fill: 'none', stroke: o[2], 'stroke-width': 2}));
+  });
+  const lg = clear($('scatterlegend'));
+  ks.forEach(k => lg.appendChild(h('span', {}, h('i', {style: 'background:' + col(k)}), 'k = ' + k)));
+  lg.appendChild(h('span', {}, 'dashed line: E = G · black ring: G-best · red ring: E-best'));
+  const pk = mt.per_k, box = clear($('gvemetrics'));
+  box.appendChild(h('div', {class: 'grid g2'},
+    h('div', {class: 'kpi'}, h('b', {}, mt.spearman.toFixed(2)), h('span', {}, 'Spearman rank correlation G–E (prediction quality, ' + mt.n_candidates + ' candidates)')),
+    h('div', {class: 'kpi'}, h('b', {}, fP(mt.decision_loss_pct, 2)), h('span', {}, 'loss of the G-best candidate under E (decision quality)')),
+    h('div', {class: 'kpi'}, h('b', {}, '#' + mt.g_best_rank_under_E), h('span', {}, 'rank of the G-best candidate under E')),
+    h('div', {class: 'kpi'}, h('b', {}, mt.ratio_E_over_G.min.toFixed(2) + ' – ' + mt.ratio_E_over_G.max.toFixed(2)), h('span', {}, 'E / G range (median ' + mt.ratio_E_over_G.median.toFixed(2) + ')'))));
+  box.appendChild(h('h3', {}, 'Within each k'));
+  box.appendChild(h('table', {}, h('tr', {}, h('th', {}, 'k'), h('th', {}, 'n'), h('th', {}, 'Spearman'), h('th', {class: 'l'}, 'G-best'), h('th', {class: 'l'}, 'E-best'), h('th', {}, 'loss')),
+    Object.keys(pk).map(k => h('tr', {}, h('td', {}, k), h('td', {}, pk[k].n), h('td', {}, pk[k].spearman.toFixed(2)), h('td', {class: 'l'}, pk[k].g_best), h('td', {class: 'l'}, pk[k].e_best), h('td', {}, fP(pk[k].decision_loss_pct, 2))))));
+  box.appendChild(h('p', {class: 'note'}, 'Reading: G ranks the whole pool only moderately, and badly among candidates of the same k, yet its best candidate is also the best under E here. A good decision does not need a good ranking everywhere. What G ignores — routing, the 48-cage / 25-stop / 250-km limits, the window, the fleet quantile, demand variability — is what makes E differ.'));
+}
+
+function renderCurve(){
+  const svg = clear($('curve')), W = 520, H = 300, m = {l: 50, r: 14, t: 14, b: 40}, c = R.curves;
+  const lo = c.optimum / 1e6 * 0.995, hi = Math.max(...c.random_p90) / 1e6 * 1.01, n = c.n.length;
+  const ax = axes(svg, W, H, m, [1, n], [lo, hi], 'Evaluations made', 'Best E found (M KRW)');
+  const pts = a => a.map((v, i) => ax.X(i + 1) + ',' + ax.Y(v / 1e6)).join(' ');
+  const band = c.random_p90.map((v, i) => ax.X(i + 1) + ',' + ax.Y(v / 1e6)).concat(c.random_p10.map((v, i) => [ax.X(i + 1), ax.Y(v / 1e6)]).reverse().map(p => p.join(',')));
+  svg.appendChild(sv('polygon', {points: band.join(' '), fill: 'var(--acc)', opacity: 0.15}));
+  svg.appendChild(sv('polyline', {points: pts(c.random_mean), fill: 'none', stroke: 'var(--mute)', 'stroke-width': 2, 'stroke-dasharray': '5 3'}));
+  svg.appendChild(sv('polyline', {points: pts(c.g_order), fill: 'none', stroke: 'var(--acc)', 'stroke-width': 2.5}));
+  svg.appendChild(sv('line', {x1: m.l, x2: W - m.r, y1: ax.Y(c.optimum / 1e6), y2: ax.Y(c.optimum / 1e6), stroke: 'var(--ok)', 'stroke-dasharray': '2 3'}));
+  svg.appendChild(sv('text', {x: W - m.r - 4, y: 26, 'text-anchor': 'end', fill: 'var(--acc)'}, 'solid: visit in ascending G'));
+  svg.appendChild(sv('text', {x: W - m.r - 4, y: 40, 'text-anchor': 'end'}, 'dashed: random order (mean, band 10–90%)'));
+  const nrand1 = c.random_mean[0] / 1e6, ng = c.g_order[0] / 1e6;
+  $('curvenote').textContent = 'After the first evaluation the G order already holds ' + ng.toFixed(1) + ' M against ' + nrand1.toFixed(1) + ' M on average for a random first pick (the optimum in the pool is ' + (c.optimum / 1e6).toFixed(1) + ' M). This is the toy version of "compare the selection rule with random selection at the same budget": the pool is tiny and fully known, so it is a demonstration, not the budgeted search of the full run.';
+}
+
+function renderLog(){
+  const t = clear($('logtable'));
+  t.appendChild(h('table', {}, h('tr', {}, h('th', {}, '#'), h('th', {class: 'l'}, 'Candidate'), h('th', {}, 'k'), h('th', {}, 'G (M)'), h('th', {}, 'E (M)'), h('th', {}, 'Best so far (M)'), h('th', {class: 'l'}, 'Rule / days')),
+    R.log.map(r => h('tr', {class: 'click', onclick: () => { $('mapsel').value = 'cand:' + r.candidate; renderMap('cand:' + r.candidate); $('map').scrollIntoView(); }},
+      h('td', {}, r.n), h('td', {class: 'l'}, r.candidate), h('td', {}, r.k), h('td', {}, fM(r.G)), h('td', {}, fM(r.E)), h('td', {}, fM(r.best_so_far)), h('td', {class: 'l'}, r.rule + ' · ' + r.days)))));
+}
+
+function renderCompare(){
+  const t = clear($('comparetable'));
+  const sv_ = (o) => o ? h('span', {class: o.mean > 0 ? 'pos' : 'neg'}, fM(o.mean) + ' M (' + fP(o.pct) + ') [' + fM(o.lo90) + ', ' + fM(o.hi90) + ']') : '—';
+  t.appendChild(h('table', {}, h('tr', {}, h('th', {class: 'l'}, 'Network'), h('th', {}, 'k'), h('th', {}, 'DC fixed'), h('th', {}, 'Vehicles'), h('th', {}, 'Fuel'), h('th', {}, 'Spot'), h('th', {}, 'Total (final days)'), h('th', {}, 'Before noon'), h('th', {}, 'Saving vs baseline (final)'), h('th', {}, 'Total (held-out)'), h('th', {}, 'Saving (held-out)')),
+    R.final.map(r => { const f = r.final; return h('tr', {}, h('td', {class: 'l'}, r.label + ' [' + r.sites.join('+') + ']'), h('td', {}, r.k), h('td', {}, fM(f.dc_fixed)), h('td', {}, fM(f.vehicle_fixed)), h('td', {}, fM(f.fuel)), h('td', {}, fM(f.spot)), h('td', {}, h('b', {}, fM(f.total))), h('td', {}, fP(100 * f.service_before_noon)), h('td', {}, sv_(r.saving_final)), h('td', {}, fM(r.holdout.total)), h('td', {}, sv_(r.saving_holdout))); })));
+  const a = R.average_day, box = clear($('avgday'));
+  box.appendChild(h('h3', {}, 'Sampled-day versus average-day evaluation'));
+  box.appendChild(h('p', {}, 'For ', h('b', {}, a.network), ': cost on the sampled days ', h('b', {}, fM(a.sampled_day_total) + ' M'), ' versus ', h('b', {}, fM(a.average_day_total) + ' M'), ' when one average day is evaluated (gap ', h('b', {}, fP(a.gap_pct)), '). Fleet size and spot hiring are not linear in demand, so the average day understates cost. Store-level noise mostly cancels inside a DC; what remains comes from the chain-wide calendar (weekday mix, season, holiday spike) that moves every store on the same day.'));
+}
+
+// ---- live solver
+const LIVE = {};
+function dayOptions(){
+  const out = [];
+  ['search', 'final', 'holdout'].forEach(set => TOY.days[set].dates.forEach((d, i) => out.push({key: set + ':' + i, label: set + ' · ' + d + ' · ' + TOY.days[set].strata[i] + ' · ' + TOY.days[set].demand[i].reduce((a, b) => a + b, 0) + ' cages', demand: TOY.days[set].demand[i]})));
+  out.push({key: 'avg', label: 'average day of the final set (weighted mean)', demand: TOY.average_final});
+  return out;
+}
+function liveNets(){ return NETS.filter(n => n.fleet); }
+function field(label, el){ return h('div', {}, h('label', {}, label), el); }
+function buildControls(){
+  const nets = liveNets(), days = dayOptions();
+  const net = h('select', {id: 'c_net'}); fillSelect(net, nets.filter(n => n.group.indexOf('Reference') === 0), 'final:baseline');
+  const dc = h('select', {id: 'c_dc'});
+  const day = h('select', {id: 'c_day'}); days.forEach(d => day.appendChild(h('option', {value: d.key}, d.label))); day.value = 'final:0';
+  const num = (id, v, step, min) => h('input', {type: 'number', id: id, value: v, step: step || 'any', min: min});
+  const mult = h('input', {type: 'range', id: 'c_mult', min: 0.5, max: 1.6, step: 0.05, value: 1}); const multl = h('span', {id: 'c_multl'}, '× 1.00');
+  mult.addEventListener('input', () => { $('c_multl').textContent = '× ' + (+mult.value).toFixed(2); });
+  const c = clear($('controls'));
+  [field('Network', net), field('DC (site)', dc), field('Demand day', day), field('Chain-wide demand multiplier (holiday spike)', h('div', {}, mult, multl)),
+   field('Delivery window: last on-time arrival (HH:MM)', h('input', {type: 'text', id: 'c_noon', value: '12:00'})), field('Stop time per store (min)', num('c_stop', 15, 1, 0)), field('Speed (km/h)', num('c_speed', 35, 1, 5)),
+   field('Vehicle capacity (cages)', num('c_cap', 48, 1, 1)), field('Max stops per vehicle', num('c_stops', 25, 1, 1)), field('Max km per vehicle', num('c_km', 250, 5, 10)),
+   field('Max route duration (hours)', num('c_dur', 10, 0.5, 1)), field('Noon budget (% of stores after the window)', num('c_alpha', 2, 0.5, 0)),
+   field('Owned fleet N (blank = fleet of the network)', h('input', {type: 'number', id: 'c_owned', min: 0, step: 1})), field('Spot-truck cap (blank = unlimited)', h('input', {type: 'number', id: 'c_cap_spot', min: 0, step: 1})),
+   h('div', {}, h('label', {}, ' '), h('button', {class: 'primary', onclick: runLive}, 'Solve'))].forEach(x => c.appendChild(x));
+  net.addEventListener('change', fillDc); fillDc();
+}
+function fillDc(){
+  const net = liveNets().find(n => n.key === $('c_net').value), dc = clear($('c_dc'));
+  net.sites.forEach((s, j) => dc.appendChild(h('option', {value: s}, s + ' · ' + net.assign.filter(a => a === j).length + ' stores')));
+}
+function parseHHMM(s){ const m = /^(\d{1,2}):(\d{2})$/.exec(String(s).trim()); return m ? (+m[1]) * 60 + (+m[2]) : NaN; }
+function setControls(o){
+  if (o.net){ $('c_net').value = o.net; fillDc(); }
+  if (o.dc) $('c_dc').value = o.dc;
+  if (o.day) $('c_day').value = o.day;
+  const m = {mult: 'c_mult', noon: 'c_noon', stop: 'c_stop', speed: 'c_speed', cap: 'c_cap', stops: 'c_stops', km: 'c_km', dur: 'c_dur', alpha: 'c_alpha', owned: 'c_owned', spotcap: 'c_cap_spot'};
+  Object.keys(m).forEach(k => { if (o[k] !== undefined) $(m[k]).value = o[k]; });
+  if (o.mult !== undefined) $('c_multl').textContent = '× ' + (+o.mult).toFixed(2);
+  ['noon', 'stop', 'speed', 'cap', 'stops', 'km', 'dur', 'alpha', 'owned', 'spotcap', 'mult'].forEach(k => { if (o[k] === undefined && o.reset !== false) $(m[k]).value = DEFAULTS[k]; });
+  if (o.mult === undefined && o.reset !== false) $('c_multl').textContent = '× 1.00';
+}
+const DEFAULTS = {mult: 1, noon: '12:00', stop: 15, speed: 35, cap: 48, stops: 25, km: 250, dur: 10, alpha: 2, owned: '', spotcap: ''};
+
+function runLive(){
+  const net = liveNets().find(n => n.key === $('c_net').value), site = $('c_dc').value, j = net.sites.indexOf(site);
+  const members = []; net.assign.forEach((a, i) => { if (a === j) members.push(i); });
+  const day = dayOptions().find(d => d.key === $('c_day').value), mult = +$('c_mult').value;
+  const noon = parseHHMM($('c_noon').value), banner = clear($('livebanner'));
+  if (isNaN(noon)){ banner.appendChild(h('div', {class: 'banner bad'}, 'The window must be written as HH:MM, e.g. 12:00.')); return; }
+  const P = mkParams({noon_min: noon, stop_min: +$('c_stop').value, speed_kmh: +$('c_speed').value, capacity: +$('c_cap').value, max_stops: Math.round(+$('c_stops').value),
+    max_km: +$('c_km').value, max_route_min: +$('c_dur').value * 60, alpha: +$('c_alpha').value / 100});
+  const ids = [site].concat(members.map(i => TOY.stores[i].id)), D = subMatrix(ids), q = [0].concat(members.map(i => day.demand[i] * mult));
+  const t0 = performance.now(), sol = solveDcDay(D, q, P), ms = performance.now() - t0;
+  const ownedRaw = $('c_owned').value, owned = ownedRaw === '' ? net.fleet[site] : +ownedRaw;
+  const capRaw = $('c_cap_spot').value, spotCap = capRaw === '' ? null : +capRaw;
+  const out = clear($('liveout'));
+  const pr = projector(640, 600, 30), svg = $('livemap'); mapBase(svg, pr);
+  members.forEach(i => { const p = pr(TOY.stores[i].lat, TOY.stores[i].lon); svg.appendChild(sv('circle', {cx: p[0], cy: p[1], r: 2.6, fill: 'var(--mute)', opacity: 0.5})); });
+  const dp = siteById(site), dpp = pr(dp.lat, dp.lon);
+  if (sol.status !== 'ok'){
+    banner.appendChild(h('div', {class: 'banner bad'}, h('b', {}, 'Infeasible: '), sol.message, ' Loosen the window, the noon budget or the vehicle limits; no solution is shown as valid.'));
+    svg.appendChild(sv('rect', {x: dpp[0] - 8, y: dpp[1] - 8, width: 16, height: 16, fill: SITE_COL[siteIndex(site)], stroke: 'var(--ink)', 'stroke-width': 2}));
+    out.appendChild(h('p', {class: 'note'}, 'Stores that cannot be reached in time even alone: ' + sol.forced_late.slice(0, 12).map(i => ids[i]).join(', ') + (sol.forced_late.length > 12 ? ' …' : '')));
+    return;
+  }
+  const acc = account(sol, P, owned, spotCap), bad = validate(sol, D, q, P);
+  const unservedIds = acc.unserved.map(i => ids[i]);
+  if (acc.unserved.length) banner.appendChild(h('div', {class: 'banner bad'}, h('b', {}, 'The fleet cannot cover this day: '), acc.unserved.length + ' stores are not delivered (stock-out, ' + fK(P.p_stockout) + ' KRW each) because only ' + owned + ' owned vehicles + ' + spotCap + ' spot trucks are available, but ' + acc.vehicles_needed + ' vehicles are needed.'));
+  else if (sol.n12 > 0) banner.appendChild(h('div', {class: 'banner warn'}, sol.n12 + ' deliveries arrive after ' + hhmm(P.noon_min) + ' (' + fP(100 * sol.n12 / sol.n_stores) + ' of stores; the noon budget allows ' + sol.budget + ').'));
+  else banner.appendChild(h('div', {class: 'banner ok'}, 'Feasible: all deliveries arrive by ' + hhmm(P.noon_min) + '. Solved in ' + ms.toFixed(0) + ' ms; independent validator: ' + (bad.length ? 'VIOLATIONS ' + bad.join(', ') : 'no rule violated') + '.'));
+  const drawn = new Set(acc.unserved);
+  sol.routes.forEach((r, k) => {
+    const col = ROUTE_COL[k % ROUTE_COL.length], pts = [dpp].concat(r.stores.map(s => pr(TOY.stores[members[s - 1]].lat, TOY.stores[members[s - 1]].lon)), [dpp]);
+    svg.appendChild(sv('polyline', {points: pts.map(p => p.join(',')).join(' '), fill: 'none', stroke: col, 'stroke-width': 1.8, opacity: 0.85}));
+    r.stores.forEach(s => { const p = pr(TOY.stores[members[s - 1]].lat, TOY.stores[members[s - 1]].lon); svg.appendChild(sv('circle', {cx: p[0], cy: p[1], r: 3.2, fill: col})); });
+  });
+  svg.appendChild(sv('rect', {x: dpp[0] - 8, y: dpp[1] - 8, width: 16, height: 16, fill: SITE_COL[siteIndex(site)], stroke: 'var(--ink)', 'stroke-width': 2}));
+  const k = (l, v, s) => h('div', {class: 'kpi'}, h('b', {}, v), h('span', {}, l + (s ? ' · ' + s : '')));
+  out.appendChild(h('div', {class: 'grid g3'}, k('stores with demand', q.filter(x => x > 0).length), k('vehicles needed', acc.vehicles_needed, 'owned ' + owned + ', spot ' + acc.spot), k('kilometres', acc.km.toFixed(0)),
+    k('after ' + hhmm(P.noon_min), sol.n12, 'after 14:00: ' + sol.n14), k('undelivered', acc.unserved.length), k('daily cost', fM2(acc.total) + ' M', 'fuel ' + fM2(acc.fuel) + ' · spot ' + fM2(acc.spot_cost) + ' · failures ' + fM2(acc.failure))));
+  const lim = sol.routes.map(r => ({cap: r.load >= 0.95 * P.capacity, clock: r.arrivals[r.arrivals.length - 1] >= P.noon_min - 30, stops: r.stores.length >= P.max_stops, km: r.km >= 0.9 * P.max_km}));
+  const cnt = key => lim.filter(x => x[key]).length;
+  out.appendChild(h('p', {class: 'note'}, 'What ends a vehicle\'s day: ' + cnt('cap') + ' of ' + lim.length + ' routes are within 5% of the load limit, ' + cnt('clock') + ' end within 30 min of the window, ' + cnt('stops') + ' hit the stop limit, ' + cnt('km') + ' are within 10% of the km limit.'));
+  out.appendChild(h('div', {class: 'scroll', style: 'max-height:260px;overflow-y:auto'}, h('table', {}, h('tr', {}, h('th', {}, 'Route'), h('th', {}, 'Stops'), h('th', {}, 'Load'), h('th', {}, 'km'), h('th', {}, 'Last stop'), h('th', {}, 'Return')),
+    sol.routes.map((r, i) => h('tr', {}, h('td', {class: 'l'}, h('i', {style: 'display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;background:' + ROUTE_COL[i % ROUTE_COL.length]}), 'R' + (i + 1) + (r.forced_late ? ' (forced late)' : '')), h('td', {}, r.stores.length), h('td', {}, r.load.toFixed(1)), h('td', {}, r.km.toFixed(0)), h('td', {}, hhmm(r.arrivals[r.arrivals.length - 1])), h('td', {}, hhmm(r.return_min)))))));
+  out.appendChild(h('p', {class: 'note'}, 'Fleet accounting follows the code: the solve prices every vehicle as a spot truck, then the routes are priced against the owned fleet N (' + owned + ').'));
+}
+function buildPresets(){
+  const p = clear($('presets'));
+  const mk = (label, o, nm) => p.appendChild(h('button', {onclick: () => { setControls(Object.assign({net: 'final:baseline'}, o)); runLive(); $('live').scrollIntoView(); }}, label));
+  const big = R.final[0].sites[0];
+  mk('Normal: baseline, busiest DC', {dc: busiestSite('final:baseline'), day: 'final:0'});
+  mk('Boundary: window at 09:00 (clock binds)', {dc: busiestSite('final:baseline'), day: 'final:0', noon: '09:00'});
+  mk('Boundary: DC at its store-count bound', {net: 'boundary', day: 'final:0', dc: TOY.sites.find(s => R.cases.boundary.sites && R.cases.boundary.sites[0] === s.id).id});
+  mk('Failure: window at 06:00 (infeasible)', {dc: busiestSite('final:baseline'), day: 'final:0', noon: '06:00'});
+  mk('Failure: fleet cannot cover the day', {net: 'final:' + (R.final.find(r => r.sites.join() === R.recommended_sites.join() && r.role !== 'baseline') || {}).role, dc: R.cases.failure_day.site, day: 'final:' + R.days_index_worst, mult: 1, spotcap: 0});
+}
+function busiestSite(key){
+  const n = liveNets().find(x => x.key === key); let best = n.sites[0], c = -1;
+  n.sites.forEach((s, j) => { const m = n.assign.filter(a => a === j).length; if (m > c){ c = m; best = s; } }); return best;
+}
+
+// ---- cases, method
+function renderCases(){
+  const c = R.cases, box = clear($('casesbody')), b = c.boundary, f = c.failure_day;
+  const rec = R.final.find(r => r.role !== 'baseline' && r.sites.join() === R.recommended_sites.join()), base = R.final[0];
+  box.appendChild(h('div', {class: 'grid g2'},
+    h('div', {}, h('h3', {}, 'Normal'), h('p', {}, 'Baseline ' + fM(base.final.total) + ' M vs recommended ' + R.recommended_sites.join('+') + ' ' + fM(rec.final.total) + ' M per month on the final days; ' + fM(base.holdout.total) + ' M vs ' + fM(rec.holdout.total) + ' M on held-out days. ',
+      h('button', {onclick: () => { setControls({net: 'final:baseline', dc: busiestSite('final:baseline'), day: 'final:0'}); runLive(); $('live').scrollIntoView(); }}, 'Run live')),
+      h('h3', {}, 'Boundary: DCs exactly at the store-count bound'), h('p', {}, b.status === 'ok' ? b.description + ' Loads ' + Object.entries(b.loads).map(e => e[0] + ' = ' + e[1]).join(', ') + '. Total ' + fM(b.total) + ' M vs ' + fM(b.normal_total) + ' M unconstrained (' + (b.extra_pct >= 0 ? '+' : '') + fP(b.extra_pct) + '). The bound is feasible, and it costs this much.' : 'Infeasible: ' + b.reason),
+      h('h3', {}, 'Boundary: a budget of one evaluation'), h('p', {}, c.budget_one.description + ' It picks ' + c.budget_one.chosen + ' (E = ' + fM(c.budget_one.E) + ' M); the best in the pool is ' + fM(c.budget_one.optimum) + ' M, a regret of ' + fP(c.budget_one.regret_pct, 2) + '.')),
+    h('div', {}, h('h3', {}, 'Failure: a number of DCs that cannot satisfy the capacity bounds'), h('ul', {}, c.failure_k.map(x => h('li', {}, x.reason))), h('p', {class: 'note'}, 'These are reported as infeasible with the reason; they are not shown as results.'),
+      h('h3', {}, 'Failure: a day the fleet cannot cover'), h('p', {}, f.description + ' At ' + f.site + ' on ' + f.date + ': ' + f.vehicles_needed + ' vehicles needed, ' + f.owned + ' owned, no spot trucks → ' + f.stores_undelivered + ' stores undelivered, failure cost ' + fM2(f.failure_cost) + ' M KRW for the day. ',
+        h('button', {onclick: () => document.querySelector('#presets button:last-child').click()}, 'Run live')),
+      h('h3', {}, 'Failure: a window that cannot be met'), h('p', {}, 'Set the window to 06:00 in the live solver: stores that cannot be reached by then even with a dedicated vehicle exceed the noon budget, and the solver reports the day as infeasible instead of producing routes.'))));
+}
+function renderMethod(){
+  const box = clear($('methodbody')), a = R.accuracy, dm = R.demand_model, tm = R.timing, bd = R.binding, o = R.outcomes;
+  box.appendChild(h('div', {class: 'grid g2'},
+    h('div', {},
+      h('h3', {}, 'What this toy is'), h('ul', {},
+        h('li', {}, 'Pipeline: generators → distances → demand model → lower level → E on the baseline → G candidates → comparison. All code is in Python (' , h('code', {}, 'code/'), '); this page embeds its output.'),
+        h('li', {}, 'Instance: ' + TOY.meta.n_stores + ' stores, 2 current DCs, 6 candidate sites, one river with five bridges. Thinning fraction ' + TOY.meta.thinning + ' (DC fixed cost and store bounds scaled by it; one stop per store, so legs are longer than in the real chain).'),
+        h('li', {}, 'Seed ' + TOY.meta.seed + '; every generator has its own derived seed (', h('code', {}, 'code/config.py'), '). Whole run: ' + Math.round(TOY.meta.runtime_seconds) + ' s.')),
+      h('h3', {}, 'What it is not'), h('ul', {},
+        h('li', {}, h('b', {}, 'Distances are a detour model, not road values'), ' (no network in the toy; not calibrated). The full run replaces them by an OSRM-filled cache of the same format.'),
+        h('li', {}, 'No budgeted surrogate search: the pool is tiny (' + R.metrics.n_candidates + ' feasible candidates), so all are evaluated.'),
+        h('li', {}, 'Few sampled days (' + TOY.meta.days.join(' / ') + ' search / final / held-out), so intervals are indicative only; held-out days reuse fleets sized on the final days.'),
+        h('li', {}, 'Outcome tables cover ' + o.days + ' days, produced by the lower level on the current network (model output, not observations).'),
+        h('li', {}, 'The live solver is a JavaScript port of the Python lower level; same algorithm and tie-breaking, checked on embedded reference cases (' , h('span', {id: 'parity2'}, '…'), ').'))),
+    h('div', {},
+      h('h3', {}, 'Accuracy of the lower-level heuristic (precomputed)'),
+      h('table', {}, h('tr', {}, h('th', {class: 'l'}, 'Setting'), h('th', {}, 'Instances'), h('th', {}, 'Optimal'), h('th', {}, 'Mean gap'), h('th', {}, 'Max gap'), h('th', {}, 'Extra vehicle')),
+        a.settings.map(s => h('tr', {}, h('td', {class: 'l'}, s.name + ' (' + s.capacity + ' cages, ' + s.max_stops + ' stops, ' + s.stores + ' stores)'), h('td', {}, s.instances), h('td', {}, fP(100 * s.share_optimal, 0)), h('td', {}, fP(s.mean_gap_pct, 2)), h('td', {}, fP(s.max_gap_pct, 1)), h('td', {}, fP(100 * s.share_with_extra_vehicle, 0))))),
+      h('p', {class: 'note'}, 'Against an exact dynamic programme on tiny instances (noon hard). The large worst-case gap is one extra vehicle when capacity is very tight (bin packing); with moderate limits the gap is under 0.2%. At full size only a bound is available.'),
+      h('h3', {}, 'What ends a vehicle\'s day (final days)'),
+      h('table', {}, h('tr', {}, h('th', {class: 'l'}, 'Network'), h('th', {}, 'Routes'), h('th', {}, 'Load ≥ 95%'), h('th', {}, 'Last stop ≤ 30 min from noon'), h('th', {}, 'Stop limit'), h('th', {}, 'km ≥ 90%')),
+        [['Baseline', bd.baseline], ['Recommended', bd.recommended]].map(r => h('tr', {}, h('td', {class: 'l'}, r[0]), h('td', {}, r[1].routes), h('td', {}, fP(100 * r[1].load_within_5pct_of_capacity, 0)), h('td', {}, fP(100 * r[1].last_stop_within_30min_of_noon, 0)), h('td', {}, fP(100 * r[1].at_stop_limit, 0)), h('td', {}, fP(100 * r[1].within_10pct_of_km_limit, 0))))),
+      h('h3', {}, 'Cost of one lower-level solve (Python, this machine)'),
+      h('table', {}, h('tr', {}, h('th', {}, 'Stores in DC-day'), h('th', {}, 'Median s'), h('th', {}, '95th pct s'), h('th', {}, 'Solves')),
+        Object.entries(tm.seconds_per_solve_by_stores).map(e => h('tr', {}, h('td', {}, '≈ ' + e[0]), h('td', {}, e[1].median.toFixed(2)), h('td', {}, e[1].p95.toFixed(2)), h('td', {}, e[1].count)))),
+      h('h3', {}, 'Demand model'),
+      h('p', {class: 'note'}, 'Poisson–Gamma with weekday × month × holiday exposure (estimated once; holiday factor ' + dm.holiday_factor.toFixed(2) + '). Prior = empirical Bayes per store type; its strength is ' + Object.values(dm.prior).map(p => p.b.toFixed(1)).join(' / ') + ' exposure-days (residential / office / mixed / roadside). Dispersion index ' + dm.dispersion_index.toFixed(2) + ' (Poisson ≈ 1). Short-history example: ' + dm.short_history.map(s => s.store_id + ' (' + s.open_days + ' days: raw ' + s.raw_mean + ' → posterior ' + s.posterior_mean + ', prior weight ' + fP(100 * s.prior_weight, 0) + ')').join('; ') + '.'))));
+}
+
+// ---- overview and navigation
+function renderOverview(){
+  const base = R.final[0], rec = R.final.find(r => r.role !== 'baseline' && r.sites.join() === R.recommended_sites.join());
+  const k = (v, l) => h('div', {class: 'kpi'}, h('b', {}, v), h('span', {}, l)), g = clear($('kpis'));
+  g.appendChild(k(fM(base.final.total) + ' M', 'baseline (2 DCs), KRW / month, final days'));
+  g.appendChild(k(fM(rec.final.total) + ' M', 'recommended ' + R.recommended_sites.join(' + ') + ' (k = ' + rec.k + ')'));
+  g.appendChild(k(fP(rec.saving_final.pct) + ' / ' + fP(rec.saving_holdout.pct), 'saving on final / held-out days'));
+  g.appendChild(k(R.metrics.spearman.toFixed(2) + ' / ' + fP(R.metrics.decision_loss_pct, 1), 'G–E rank correlation / loss of the G-best choice'));
+  const t = clear($('overview-text'));
+  t.appendChild(h('p', {}, 'Two questions: ', h('i', {}, 'how many DCs and where'), ' (upper level, choose among six candidate sites) and ', h('i', {}, 'what does a given network cost'), ' (lower level: daily routing from each DC on sampled demand days, then fleet, fuel, spot and failures). The lower level evaluates the upper-level candidate; the assignment of stores to DCs is re-solved inside each evaluation.'));
+  t.appendChild(h('p', {class: 'note'}, 'All figures are for a fictional chain and a detour-model distance table; they show that the pipeline runs and how its parts interact, not what a real redesign would save. Reproduce every precomputed number with ', h('code', {}, TOY.meta.command), ' in ', h('code', {}, 'code/'), '.'));
+}
+function buildNav(){
+  const nav = clear($('nav'));
+  [['overview', 'Overview'], ['map', 'Map'], ['sweep', 'Sweep'], ['gve', 'G vs E'], ['log', 'Log'], ['compare', 'Baseline comparison'], ['live', 'Live solver'], ['cases', 'Cases'], ['method', 'Method & limits']].forEach(x => nav.appendChild(h('a', {href: '#' + x[0]}, x[1])));
+}
+function parityCheck(){
+  let ok = 0, total = 0, msgs = [];
+  TOY.parity.forEach(c => {
+    total++;
+    const ids = [c.site].concat(c.store_ids), D = subMatrix(ids), P = mkParams(c.params), sol = solveDcDay(D, c.q, P), e = c.expected;
+    const same = sol.status === e.status && sol.vehicles === e.vehicles && Math.abs(sol.km - e.km) < 1e-6 && sol.n12 === e.n12 && sol.n14 === e.n14 &&
+      JSON.stringify(sol.routes.map(r => r.stores)) === JSON.stringify(e.routes);
+    if (same) ok++; else msgs.push(c.label);
+  });
+  const txt = ok === total ? ('parity with Python: ' + ok + '/' + total + ' reference cases identical') : ('PARITY MISMATCH on: ' + msgs.join('; '));
+  ['parity', 'parity2'].forEach(id => { const el = $(id); if (el){ el.textContent = txt; el.style.color = ok === total ? 'var(--ok)' : 'var(--bad)'; } });
+}
+
+function init(){
+  if (!TOY){ document.body.appendChild(h('p', {}, 'No data embedded: run python run_toy.py in code/ to build this page.')); return; }
+  buildDist(); buildNets(); buildNav(); renderOverview();
+  const sel = $('mapsel'); fillSelect(sel, NETS, 'final:' + R.final.find(r => r.role !== 'baseline' && r.sites.join() === R.recommended_sites.join()).role);
+  sel.addEventListener('change', () => renderMap(sel.value)); renderMap(sel.value);
+  renderSweep(); renderScatter(); renderCurve(); renderLog(); renderCompare();
+  R.days_index_worst = TOY.days.final.demand.map(d => d.reduce((a, b) => a + b, 0)).reduce((bi, v, i, a) => v > a[bi] ? i : bi, 0);
+  buildControls(); buildPresets(); renderCases(); renderMethod();
+  setControls({net: 'final:baseline', dc: busiestSite('final:baseline'), day: 'final:0'}); runLive();
+  setTimeout(parityCheck, 30);
+}
+if (typeof window !== 'undefined' && typeof document !== 'undefined' && !window.__NO_INIT__) init();
+</script>
+</body>
+</html>
