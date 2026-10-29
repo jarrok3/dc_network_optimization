@@ -49,7 +49,11 @@ belong to an older toy workflow. Its generator loader imports are incomplete;
 it is not an executable nationwide optimizer. The files under [app/](./app/)
 also reference missing assignment/table modules. This change provides executable
 preprocessing and explicit interfaces for a future nationwide evaluator; it
-does not implement the full search or repair the old demo.
+does not implement the full search or repair the old demo's build pipeline.
+Daily routing now has an executable nationwide API and CLI: see
+[lower_level/README.md](./lower_level/README.md). For a standalone example run
+`python -m lower_level`, or `python run_demo.py --routing`; these commands use
+the existing tables, saved planning days and distance cache.
 
 ### 1. Detour calibration
 

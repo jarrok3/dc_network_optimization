@@ -53,9 +53,35 @@ class RoadDistances:
         area = pair_area(self.stores.loc[a, "region"], self.stores.loc[b, "region"])
         return self.model.estimate(direct, area), "detour"
 
+    def submatrix_with_sources(self, ids):
+        """Batch cached pairs; only uncached long legs need scalar detour lookup."""
+        ids = list(ids)
+        if len(set(ids)) != len(ids):
+            raise ValueError("distance submatrix IDs must be unique")
+        unknown = set(ids) - set(self.points.index)
+        if unknown:
+            raise KeyError(f"unknown distance endpoints: {sorted(unknown)}")
+        n = len(ids)
+        matrix = np.zeros((n, n))
+        sources = np.full((n, n), "identity", dtype="<U8")
+        i, j = np.triu_indices(n, k=1)
+        if not len(i):
+            return matrix, sources
+        names = np.asarray(ids)
+        forward = pd.MultiIndex.from_arrays([names[i], names[j]], names=self.cache.index.names)
+        rows = self.cache.reindex(forward)
+        km = rows.km.to_numpy(copy=True)
+        source = rows.source.to_numpy(copy=True)
+        missing = np.flatnonzero(pd.isna(km))
+        if len(missing):
+            backward = pd.MultiIndex.from_arrays([names[j[missing]], names[i[missing]]], names=self.cache.index.names)
+            reverse = self.cache.reindex(backward)
+            km[missing], source[missing] = reverse.km.to_numpy(), reverse.source.to_numpy()
+        for pos in np.flatnonzero(pd.isna(km)):
+            km[pos], source[pos] = self.lookup(ids[i[pos]], ids[j[pos]])
+        matrix[i, j] = matrix[j, i] = km
+        sources[i, j] = sources[j, i] = source
+        return matrix, sources
+
     def submatrix(self, ids):
-        matrix = np.zeros((len(ids), len(ids)))
-        for i, a in enumerate(ids):
-            for j in range(i + 1, len(ids)):
-                matrix[i, j] = matrix[j, i] = self.lookup(a, ids[j])[0]
-        return matrix
+        return self.submatrix_with_sources(ids)[0]

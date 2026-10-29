@@ -3,6 +3,7 @@ Build the toy instance (if needed) and serve ui/ on http://127.0.0.1:8000
 
   python run_demo.py --build     generate tables, distances, evaluations, ui/toy_data.js
   python run_demo.py             serve the demo (builds first if toy_data.js is missing)
+  python run_demo.py --routing   run the nationwide offline daily-routing example
 """
 from __future__ import annotations
 
@@ -20,9 +21,6 @@ if str(ROOT) not in sys.path:
 import numpy as np
 
 import config as cfg
-from distances.compute import build_distance_cache
-from generator.generate import generate_tables
-from upper_level.search import run_upper
 
 
 def _json_default(o):
@@ -36,6 +34,8 @@ def _json_default(o):
 
 
 def build(log=print):
+    from generator.generate import generate_tables
+    from upper_level.search import run_upper
     log("1/3 generating dummy tables → generator/data/")
     # Jeśli wysyłasz w zipie gotowe data/*.csv to ten krok też możesz opcjonalnie pominąć
     info = generate_tables()
@@ -82,7 +82,14 @@ def serve(port: int, open_browser: bool):
 
 
 def main():
+    # Keep the nationwide routing entry point independent of incomplete legacy imports.
+    # Remaining arguments are the same as `python -m lower_level`.
+    if "--routing" in sys.argv[1:]:
+        from lower_level.__main__ import main as routing_main
+        routing_main([arg for arg in sys.argv[1:] if arg != "--routing"])
+        return
     p = argparse.ArgumentParser(description="Toy DC-network demo")
+    p.epilog = "Nationwide daily routing: python run_demo.py --routing --help"
     p.add_argument("--build", action="store_true", help="regenerate data and evaluations")
     p.add_argument("--port", type=int, default=8000)
     p.add_argument("--no-browser", action="store_true")
