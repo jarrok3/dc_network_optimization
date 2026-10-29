@@ -73,7 +73,16 @@ def generate_tables(seed: int | None = None) -> dict:
     for i in range(N_SITES):
         lat = rng.uniform(34.3, 38.3)
         lon = rng.uniform(126.1, 129.4)
-        mult = 1.3 if lat > 37.0 and lon < 127.5 else rng.uniform(0.9, 1.1)
+        
+        # [ZMIANA 1: KOREKTA MNOŻNIKÓW KOSZTÓW STAŁYCH Z UWZGLĘDNIENIEM INNYCH METROPOLII I SZUMU]
+        if lat > 37.0 and lon < 127.5:
+            base_mult = 1.3
+        elif (35.0 < lat < 35.4 and lon > 128.8) or (35.7 < lat < 36.0 and lon > 128.4): 
+            base_mult = 1.1
+        else:
+            base_mult = 0.9
+        mult = base_mult * rng.uniform(0.9, 1.1)
+
         sites.append({
             "site_id": f"SITE_{i:02d}",
             "lat": round(lat, 6),
@@ -115,10 +124,17 @@ def generate_tables(seed: int | None = None) -> dict:
 
         lat, lon = _clip_korea_mainland(rng.normal(lat0, scatter), rng.normal(lon0, scatter * 1.2))
         stype = TYPES[int(rng.choice(len(TYPES), p=TYPE_P))]
-        opened = date(2012, 1, 1) + timedelta(days=int(rng.integers(0, 5000)))
+        
+        # [ZMIANA 2: KOREKTA WIEKU SKLEPÓW (4% nowych, 2% zamkniętych w ostatnim roku)]
+        u_age = rng.random()
+        if u_age < 0.04:
+            opened = date.fromisoformat(HISTORY_END) - timedelta(days=int(rng.integers(0, 365)))
+        else:
+            opened = date(2012, 1, 1) + timedelta(days=int(rng.integers(0, 5000)))
+
         closed = ""
         if rng.random() < 0.02:
-            closed = (date.fromisoformat(HISTORY_END) - timedelta(days=int(rng.integers(10, 80)))).isoformat()
+            closed = (date.fromisoformat(HISTORY_END) - timedelta(days=int(rng.integers(1, 365)))).isoformat()
             
         nearest_dc = min(dcs, key=lambda dc: (lat - dc["lat"])**2 + (lon - dc["lon"])**2)
         
