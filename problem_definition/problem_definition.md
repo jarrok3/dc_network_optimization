@@ -538,6 +538,47 @@ The single average-day approximation costs **1,732.841 M**, understating D28 by 
 
 The saved artifacts show assignment, fleet sizing, consistent monthly accounting and held-out service for this synthetic 290 km case. They expose a proved k=8 failure, unresolved k=9, an infeasible fixed-site reassignment reference and per-DC rejection of otherwise computed plans. They do **not** establish a real-company optimum, 250 km compliance, robustness under sensitivities, or completion of the larger routing-accuracy/development studies.
 
+### 5.6 Running the interactive demonstration locally
+
+The updated [demo.html](../ui/demo.html) presents the saved optimization results through a local website. It reads the [higher-level results](../code/results/higher_level/) and joins store coordinates and site limits from the nationwide [data tables](../data/). Keep these directories together with [run_demo.py](../run_demo.py) and the complete [ui directory](../ui/); copying the HTML file alone is insufficient.
+
+**Start the viewer (Windows / PowerShell).** Open a terminal in the local solution folder containing both `dc_network_optimization` and the project virtual environment `venv_midterm`, then run:
+
+```powershell
+.\venv_midterm\Scripts\python.exe .\dc_network_optimization\run_demo.py
+```
+
+If the terminal is already inside `dc_network_optimization`, use instead:
+
+```powershell
+..\venv_midterm\Scripts\python.exe .\run_demo.py
+```
+
+The launcher opens [http://127.0.0.1:8000/demo.html](http://127.0.0.1:8000/demo.html) in the browser. Keep the terminal running while using the page; press **Ctrl+C** there to stop the server. Do not open the HTML by double-clicking it: the page needs the localhost endpoints that serve the saved results.
+
+**On another computer.** A copied virtual environment may not work after relocation. If `venv_midterm` is absent or unusable, install Python 3.10 or newer, open PowerShell inside `dc_network_optimization`, and create a fresh sibling environment before launching:
+
+```powershell
+py -3 -m venv ..\venv_midterm
+..\venv_midterm\Scripts\python.exe .\run_demo.py
+```
+
+The viewer uses only Python's standard library and local browser assets: no package installation, internet connection, OSRM service or new optimization run is needed to view the existing outputs.
+
+**Options and checks.** From inside `dc_network_optimization`:
+
+```powershell
+# If port 8000 is occupied; open http://127.0.0.1:8080/demo.html manually.
+..\venv_midterm\Scripts\python.exe .\run_demo.py --no-browser --port 8080
+
+# Check that the saved presentation inputs can be read, without starting a server.
+..\venv_midterm\Scripts\python.exe .\run_demo.py --check-results
+```
+
+**What to inspect.** Use the network selector to compare the recommendation, historical baseline, D28 finalists and D7 search evaluations. The map supports DC filtering, reassigned-store highlighting, pan and zoom. Other panels compare D28/H14 cost and service, inspect individual DC-days, show the k-sweep and guided/random search, and preview or download the original JSON/JSONL artifacts. The map shows saved assignments, not road-route geometry; it does not rerun the router.
+
+Viewing and refreshing are read-only. The current [report.json](../code/results/higher_level/report.json) is authoritative; infeasible references remain labelled as such. The existing `--build`, `--network` and `--routing` flags explicitly invoke optimization and are **not required to launch this presentation**. Further viewer details are in the [UI instructions](../ui/README.md).
+
 ## 6. Client Proposal
 
 **Recommendation: use the 11-site design as a conditional planning target for the modelled 1,970-store operation, then validate it through a staged pilot before lease commitments.** Do not force the network to eight DCs: that case was MIP-proven infeasible. Do not describe nine as impossible; it remained unresolved. Eleven is the lowest-cost accepted design found, not a proven global optimum.
