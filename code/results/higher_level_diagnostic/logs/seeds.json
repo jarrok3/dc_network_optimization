@@ -1,0 +1,42 @@
+{
+  "seed": 437,
+  "day_set": "D7",
+  "seed_ids": [
+    "SITE_00",
+    "SITE_00+SITE_28"
+  ],
+  "certificates": {
+    "1": {
+      "k": 1,
+      "status": "ok",
+      "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)",
+      "beta": 1.0,
+      "spacing_km": 0.0,
+      "seconds": 0.04057919996557757,
+      "optimality_proven": true,
+      "mip_gap": 0.0,
+      "bound_krw": 44615405.52834152,
+      "sites": [
+        "SITE_00"
+      ],
+      "objective_krw": 44615405.52834151
+    },
+    "2": {
+      "k": 2,
+      "status": "ok",
+      "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)",
+      "beta": 1.0,
+      "spacing_km": 0.0,
+      "seconds": 0.11274529999354854,
+      "optimality_proven": true,
+      "mip_gap": 0.0,
+      "bound_krw": 70939449.89638932,
+      "sites": [
+        "SITE_00",
+        "SITE_28"
+      ],
+      "objective_krw": 70939449.89638932
+    }
+  },
+  "certificate_objective": "F + lambda*P"
+}

@@ -43,13 +43,15 @@ To create new tables, run [generator/generate.py](./generator/generate.py).
 | [code/cache/](./code/cache/) | Existing Parquet cache and new calibration outputs |
 | [code/demand/](./code/demand/) | Fitted model, posteriors and planning arrays |
 
-[config.py](./config.py), [distances/compute.py](./distances/compute.py),
-[upper_level/search.py](./upper_level/search.py) and [run_demo.py](./run_demo.py)
-belong to an older toy workflow. Its generator loader imports are incomplete;
-it is not an executable nationwide optimizer. The files under [app/](./app/)
-also reference missing assignment/table modules. This change provides executable
-preprocessing and explicit interfaces for a future nationwide evaluator; it
-does not implement the full search or repair the old demo's build pipeline.
+[higher_level/](./higher_level/) now implements the nationwide assignment,
+monthly evaluation, candidate pool, guided/random search and final/held-out
+comparison. See [higher_level/README.md](./higher_level/README.md) for commands
+and the current full-data infeasibility result (eight uncovered active stores).
+[upper_level/search.py](./upper_level/search.py) forwards the old entry point to
+the new implementation. Run `python -m higher_level` or
+`python run_demo.py --network` to write JSON reports using prepared data.
+The older [app/](./app/) files and browser illustration remain separate legacy
+code; the new strategic reports are not a browser UI payload.
 Daily routing now has an executable nationwide API and CLI: see
 [lower_level/README.md](./lower_level/README.md). For a standalone example run
 `python -m lower_level`, or `python run_demo.py --routing`; these commands use

@@ -1,0 +1,239 @@
+{
+  "candidates": [
+    {
+      "id": "SITE_00",
+      "sites": [
+        "SITE_00"
+      ],
+      "G": 44615405.52834152,
+      "proxy": 15117.010668425006,
+      "features": [
+        1,
+        17.613589772781783,
+        1.4346359090040535,
+        0.0,
+        0.7142857142857143,
+        42.9
+      ],
+      "origin": "p-median",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_26",
+      "sites": [
+        "SITE_26"
+      ],
+      "G": 71485618.76468723,
+      "proxy": 31574.820633582553,
+      "features": [
+        1,
+        18.085006851275427,
+        1.3417912442223212,
+        0.0,
+        1.0,
+        93.87178
+      ],
+      "origin": "one-site neighbour",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_28",
+      "sites": [
+        "SITE_28"
+      ],
+      "G": 47389214.07856902,
+      "proxy": 14947.255448787166,
+      "features": [
+        1,
+        17.673905209686588,
+        1.637658894930027,
+        0.0,
+        0.7142857142857143,
+        47.26336
+      ],
+      "origin": "one-site neighbour",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_30",
+      "sites": [
+        "SITE_30"
+      ],
+      "G": 69084448.94162375,
+      "proxy": 32954.703996000506,
+      "features": [
+        1,
+        18.05084021191397,
+        1.513033416312045,
+        0.0,
+        0.7142857142857143,
+        95.87746
+      ],
+      "origin": "one-site neighbour",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_56",
+      "sites": [
+        "SITE_56"
+      ],
+      "G": 63329634.6867245,
+      "proxy": 30335.93569402892,
+      "features": [
+        1,
+        17.963863940068027,
+        1.8286716434473425,
+        0.0,
+        0.7142857142857143,
+        80.48562
+      ],
+      "origin": "one-site neighbour",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_00+SITE_28",
+      "sites": [
+        "SITE_00",
+        "SITE_28"
+      ],
+      "G": 70939449.89638932,
+      "proxy": 12483.565017890063,
+      "features": [
+        2,
+        18.077337252788414,
+        1.623498104887717,
+        0.025,
+        0.35714285714285715,
+        38.71055
+      ],
+      "origin": "p-median",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_26+SITE_28",
+      "sites": [
+        "SITE_26",
+        "SITE_28"
+      ],
+      "G": 85253172.44005978,
+      "proxy": 18461.900440096884,
+      "features": [
+        2,
+        18.261135886808635,
+        1.5775554175991857,
+        0.4,
+        0.5,
+        76.98897999999998
+      ],
+      "origin": "one-site neighbour",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_28+SITE_30",
+      "sites": [
+        "SITE_28",
+        "SITE_30"
+      ],
+      "G": 82070268.76621681,
+      "proxy": 19189.359475597972,
+      "features": [
+        2,
+        18.223086374441728,
+        1.6830068079862968,
+        0.415,
+        0.35714285714285715,
+        82.04982
+      ],
+      "origin": "one-site neighbour",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_28+SITE_45",
+      "sites": [
+        "SITE_28",
+        "SITE_45"
+      ],
+      "G": 80377585.82209897,
+      "proxy": 19509.10954659123,
+      "features": [
+        2,
+        18.20224591197468,
+        1.569318294042079,
+        0.435,
+        0.35714285714285715,
+        76.73544
+      ],
+      "origin": "one-site neighbour",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    },
+    {
+      "id": "SITE_28+SITE_56",
+      "sites": [
+        "SITE_28",
+        "SITE_56"
+      ],
+      "G": 77834426.64511299,
+      "proxy": 17838.30443819691,
+      "features": [
+        2,
+        18.170094393138747,
+        1.8452155414453926,
+        0.44,
+        0.35714285714285715,
+        67.85225
+      ],
+      "origin": "one-site neighbour",
+      "quantile": 0.6666666666666666,
+      "vehicle_proxy_term": 0.0
+    }
+  ],
+  "seeds": [
+    "SITE_00",
+    "SITE_00+SITE_28"
+  ],
+  "certificates": {
+    "1": {
+      "k": 1,
+      "status": "ok",
+      "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)",
+      "beta": 1.0,
+      "spacing_km": 0.0,
+      "seconds": 0.04057919996557757,
+      "optimality_proven": true,
+      "mip_gap": 0.0,
+      "bound_krw": 44615405.52834152,
+      "sites": [
+        "SITE_00"
+      ],
+      "objective_krw": 44615405.52834151
+    },
+    "2": {
+      "k": 2,
+      "status": "ok",
+      "message": "Optimization terminated successfully. (HiGHS Status 7: Optimal)",
+      "beta": 1.0,
+      "spacing_km": 0.0,
+      "seconds": 0.11274529999354854,
+      "optimality_proven": true,
+      "mip_gap": 0.0,
+      "bound_krw": 70939449.89638932,
+      "sites": [
+        "SITE_00",
+        "SITE_28"
+      ],
+      "objective_krw": 70939449.89638932
+    }
+  },
+  "rejected_k": [],
+  "requested_size": 10,
+  "actual_size": 10
+}
