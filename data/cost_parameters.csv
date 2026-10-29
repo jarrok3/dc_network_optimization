@@ -1,0 +1,10 @@
+name,value,unit
+fuel_per_km,350,KRW/km
+vehicle_monthly,5500000,KRW/month
+spot_daily,550000,KRW/day
+late_penalty,120000,KRW
+stockout_penalty,500000,KRW
+capacity_cages,48,cages
+dc_fixed,30000000,KRW/month
+min_stores,100,stores
+max_stores,280,stores
