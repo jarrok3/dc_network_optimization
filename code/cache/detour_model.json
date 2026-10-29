@@ -1,0 +1,167 @@
+{
+  "version": 1,
+  "global_ratio": 1.4276085528781788,
+  "by_band": {
+    "0": 1.726109515806635,
+    "1": 1.4026403982816926,
+    "2": 1.3445349521940113,
+    "3": 1.3309694277527788,
+    "4": 1.227777114701486
+  },
+  "by_band_area": {
+    "0|capital": 1.6149853281386208,
+    "0|other-metro": 2.0976528307941056,
+    "0|rural": 1.6328001785244834,
+    "1|capital": 1.3410540124273165,
+    "1|other-metro": 1.551920795949654,
+    "1|rural": 1.3895865853020877,
+    "2|capital": 1.3389560520474926,
+    "2|other-metro": 1.4086839922482863,
+    "2|rural": 1.3075526623640754,
+    "3|capital": 1.2996186651687267,
+    "3|other-metro": 1.3839025777527785,
+    "3|rural": 1.3093870403368322,
+    "4|capital": 1.2957875131692045,
+    "4|other-metro": 1.2138584001162778,
+    "4|rural": 1.2445781542847425
+  },
+  "fallback": "band-area, then band, then global; training observations only",
+  "band_edges_km": [
+    0,
+    10,
+    30,
+    60,
+    150,
+    null
+  ],
+  "seed": 437,
+  "train_n": 700,
+  "validation_n": 300,
+  "symmetric": "mean of forward and reverse OSRM distances",
+  "area_rule": "rural if either endpoint rural; capital if both capital; otherwise other-metro",
+  "river_screen": "approximate opposite Han banks; route crossing not verified",
+  "validation": {
+    "n": 300,
+    "mape_percent": 12.269261873887597,
+    "bias_percent": 4.106889749741676,
+    "mae_km": 5.6502209949052755
+  },
+  "validation_by_band_area": {
+    "0|capital": {
+      "n": 30,
+      "mape_percent": 20.098865886156744,
+      "bias_percent": 8.200263885772594,
+      "mae_km": 2.2430662127686887
+    },
+    "0|other-metro": {
+      "n": 15,
+      "mape_percent": 31.015386144689415,
+      "bias_percent": 19.003969627256875,
+      "mae_km": 3.017927855109776
+    },
+    "0|rural": {
+      "n": 24,
+      "mape_percent": 32.90059777561662,
+      "bias_percent": 16.76155477680511,
+      "mae_km": 3.459401264819871
+    },
+    "1|capital": {
+      "n": 30,
+      "mape_percent": 8.739971679560576,
+      "bias_percent": -2.423605528978392,
+      "mae_km": 2.535141057810634
+    },
+    "1|other-metro": {
+      "n": 15,
+      "mape_percent": 10.291266950041983,
+      "bias_percent": 2.951736315854774,
+      "mae_km": 3.540183732308923
+    },
+    "1|rural": {
+      "n": 30,
+      "mape_percent": 11.30677199758695,
+      "bias_percent": 6.274382075394468,
+      "mae_km": 2.7238380682280563
+    },
+    "2|capital": {
+      "n": 30,
+      "mape_percent": 8.118776180313619,
+      "bias_percent": 3.539154025632589,
+      "mae_km": 4.1193904239556804
+    },
+    "2|other-metro": {
+      "n": 15,
+      "mape_percent": 9.173457424073463,
+      "bias_percent": -2.244088760042751,
+      "mae_km": 6.090834956341441
+    },
+    "2|rural": {
+      "n": 21,
+      "mape_percent": 7.638575209438649,
+      "bias_percent": 0.08244163169136492,
+      "mae_km": 4.731913800138592
+    },
+    "3|capital": {
+      "n": 15,
+      "mape_percent": 7.297268177897966,
+      "bias_percent": 2.445836885550455,
+      "mae_km": 6.939900566677131
+    },
+    "3|other-metro": {
+      "n": 15,
+      "mape_percent": 8.230767046964386,
+      "bias_percent": 1.5541913652054296,
+      "mae_km": 10.866403897025775
+    },
+    "3|rural": {
+      "n": 15,
+      "mape_percent": 6.736538833206749,
+      "bias_percent": 0.3895841466648302,
+      "mae_km": 10.797124235024876
+    },
+    "4|capital": {
+      "n": 2,
+      "mape_percent": 6.892769455246228,
+      "bias_percent": 6.892769455246228,
+      "mae_km": 12.85600047925628
+    },
+    "4|other-metro": {
+      "n": 28,
+      "mape_percent": 3.1442991123242536,
+      "bias_percent": 1.0660863359924655,
+      "mae_km": 8.988066840135707
+    },
+    "4|rural": {
+      "n": 15,
+      "mape_percent": 5.988425409070021,
+      "bias_percent": -2.986793183106801,
+      "mae_km": 17.857593620698164
+    }
+  },
+  "validation_river_screen": {
+    "n": 75,
+    "mape_percent": 14.801568107724725,
+    "bias_percent": 9.107728604910125,
+    "mae_km": 2.8207773413588706
+  },
+  "validation_long_distance": {
+    "n": 90,
+    "mape_percent": 5.840232289585093,
+    "bias_percent": 0.7186471614776688,
+    "mae_km": 10.825480080818906
+  },
+  "ratio_quantiles": {
+    "0.0": 1.0921758823165135,
+    "0.1": 1.179845199924482,
+    "0.5": 1.3107526682873927,
+    "0.9": 1.677975483765642,
+    "1.0": 13.46991906819437
+  },
+  "stores_sha256": "129359798bc722e049189eb835cb035d11673fc5660d62c18e3020c2228d1899",
+  "osrm_url": "http://localhost:5000",
+  "sample_size": 1000,
+  "max_snap_m": 500,
+  "rejected_pairs_n": 925,
+  "sampling_target": "road-connected endpoints snapping within max_snap_m; failed pairs replaced, rare exhausted cells redistribute",
+  "snap_over_500m_n": 0
+}

@@ -1,0 +1,7 @@
+__pycache__
+*.csv
+.idea/
+*.pyc
+
+# Reproducible fitted demand models and sampled planning arrays.
+/code/demand/
