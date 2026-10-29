@@ -37,11 +37,16 @@ def _json_default(o):
 
 def build(log=print):
     log("1/3 generating dummy tables → generator/data/")
+    # Jeśli wysyłasz w zipie gotowe data/*.csv to ten krok też możesz opcjonalnie pominąć
     info = generate_tables()
     log("   ", info)
-    log("2/3 building distance cache → distances/cache/")
-    dist = build_distance_cache()
-    log("   ", dist.meta["n_points"], "points")
+    
+    log("2/3 checking distance cache → cache/road_distance.parquet")
+    if not (cfg.CACHE_DIR / "road_distance.parquet").exists():
+         log("BŁĄD: Brak pliku road_distance.parquet. Skrypt oceniający wymaga wygenerowanego bufora.")
+         sys.exit(1)
+    log("    Plik cache obecny. Pobieranie odległości w trybie OFFLINE.")
+    
     log("3/3 running upper-level search (this is the slow step)")
     payload = run_upper(log=log)
     cfg.UI_DIR.mkdir(parents=True, exist_ok=True)

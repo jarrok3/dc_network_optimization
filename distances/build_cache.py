@@ -53,7 +53,7 @@ def get_osrm_distances(src, dst_list):
     url = f"{OSRM_URL}/{coords_str}?sources=0&annotations=distance"
     
     try:
-        response = requests.get(url)
+        response = requests.get(url, timeout=30)
         response.raise_for_status()
         data = response.json()
         
@@ -62,7 +62,7 @@ def get_osrm_distances(src, dst_list):
             
         # Wyciągamy dystanse z pierwszego źródła do wszystkich celów (omijając dystans źródło-źródło na indeksie 0)
         distances_meters = data["distances"][0][1:]
-        return [dist / 1000.0 for dist in distances_meters]
+        return [dist / 1000.0 if dist is not None else None for dist in distances_meters]
         
     except Exception as e:
         print(f"Błąd zapytania OSRM dla źródła {src['id']}: {e}")

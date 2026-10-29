@@ -1,0 +1,7 @@
+{
+  "stores_sha256": "129359798bc722e049189eb835cb035d11673fc5660d62c18e3020c2228d1899",
+  "osrm_url": "http://localhost:5000",
+  "seed": 437,
+  "sample_size": 1000,
+  "max_snap_m": 500
+}

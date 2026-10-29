@@ -1,0 +1,10 @@
+{
+    "source": "engine",
+    "distance_metric": "km",
+    "engine": "OSRM osrm-backend via car.lua",
+    "extract_date": "2026-10-29",
+    "pairs_computed": 1186390,
+    "symmetric_assumption": true,
+    "store_store_radius_km": 60.0,
+    "execution_time_seconds": 543.7
+}

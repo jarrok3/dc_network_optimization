@@ -30,7 +30,7 @@ N_HISTORY_DAYS = 365
 HISTORY_END = "2026-10-27"
 
 # Ścieżki wyjściowe
-DATA_DIR = Path("data")
+DATA_DIR = Path(__file__).resolve().parents[1] / "data"
 STORES_CSV = DATA_DIR / "stores.csv"
 DCS_CSV = DATA_DIR / "dcs.csv"
 SITES_CSV = DATA_DIR / "candidate_sites.csv"
