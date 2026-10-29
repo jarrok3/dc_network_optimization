@@ -202,6 +202,9 @@ class DistanceTests(unittest.TestCase):
             (root / "model.json").write_text(json.dumps({"global_ratio": 1.3, "by_band": {}, "by_band_area": {}}))
             table = RoadDistances(root / "stores.csv", root / "sites.csv", root / "cache.parquet", root / "model.json")
             self.assertEqual(table.lookup("A", "DC"), (9, "engine"))
+            cached_matrix, sources = table.submatrix_with_sources(["A", "DC"])
+            self.assertEqual(cached_matrix[0, 1], 9)
+            self.assertEqual(sources[1, 0], "engine")
             self.assertEqual(table.lookup("A", "B")[1], "detour")
             self.assertEqual(table.lookup("A", "A"), (0, "identity"))
             with self.assertRaisesRegex(KeyError, "required engine distance"):

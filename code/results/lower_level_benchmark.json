@@ -1,0 +1,98 @@
+{
+  "site_id": "SITE_00",
+  "day_set": "D_dev",
+  "scope": "nearest eligible subsets; development evidence, not a whole-network evaluation or optimality study",
+  "timing_scope": "single solver process; solve times exclude initial distance loading and matrix preparation",
+  "results": [
+    {
+      "n_stores": 100,
+      "n_days": 7,
+      "solve_seconds_median": 0.08820379996905103,
+      "solve_seconds_p95": 0.09157962999888695,
+      "matrix_seconds_first_day": 0.007920000003650784,
+      "matrix_cache_hits": 6,
+      "vehicles_by_day": [
+        7,
+        7,
+        7,
+        7,
+        7,
+        7,
+        7
+      ],
+      "owned_fleet_quantile_2_3": 7,
+      "unserved_by_day": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "minimum_service_before_noon": 1.0,
+      "all_days_meet_service": true,
+      "weighted_daily_fuel_spot_failure_krw": 274735.4041369863
+    },
+    {
+      "n_stores": 200,
+      "n_days": 7,
+      "solve_seconds_median": 0.29962999996496364,
+      "solve_seconds_p95": 0.34900906000402754,
+      "matrix_seconds_first_day": 0.057937600009609014,
+      "matrix_cache_hits": 6,
+      "vehicles_by_day": [
+        13,
+        13,
+        13,
+        13,
+        13,
+        13,
+        13
+      ],
+      "owned_fleet_quantile_2_3": 13,
+      "unserved_by_day": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "minimum_service_before_noon": 0.98,
+      "all_days_meet_service": true,
+      "weighted_daily_fuel_spot_failure_krw": 614983.5799589041
+    },
+    {
+      "n_stores": 280,
+      "n_days": 7,
+      "solve_seconds_median": 0.598085799952969,
+      "solve_seconds_p95": 0.6882957600057125,
+      "matrix_seconds_first_day": 0.4712039000005461,
+      "matrix_cache_hits": 6,
+      "vehicles_by_day": [
+        18,
+        18,
+        19,
+        18,
+        19,
+        19,
+        18
+      ],
+      "owned_fleet_quantile_2_3": 19,
+      "unserved_by_day": [
+        0,
+        0,
+        0,
+        0,
+        0,
+        0,
+        0
+      ],
+      "minimum_service_before_noon": 0.9821428571428571,
+      "all_days_meet_service": true,
+      "weighted_daily_fuel_spot_failure_krw": 901980.4708082192
+    }
+  ]
+}
