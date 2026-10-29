@@ -2,13 +2,17 @@
 
 **IE437 Midterm Project · Distribution-Centre Network Redesign — Formulating and Solving a Hierarchical Decision**
 
-Author / student ID: [entry]  
-Date / version: 2026-10-28 · v0.2 (Sections 1–4 drafted before any code; Sections 5–7 pending)  
-Summary: TBD — to be written after the experiments (recommended number of DCs, estimated saving and its uncertainty, the one simplification that matters most).  
-Files: `problem-definition.md`, `code/`, `demo.html` or the local app in `code/`, `proposal.html`  
-LLM tools and use: Claude (Anthropic, Sonnet 5.5), 2026-10-27 — structuring the problem (boundary, decisions, dependencies, classification) and drafting Sections 1–4 (2026-10-27 and 2026-10-28; Section 3 external facts checked by web search, sources cited beside the claims). Assessments of its suggestions are recorded in Section 7 (pending).
+Author / student ID: [entry]
 
-Marking: `[ASSUMPTION]` = assumption; `TBD` = unresolved fact (carried to the Section 3 table); `N/A — reason` = inapplicable.
+Date / version: 2026-10-29 · v0.3 (implemented model and saved full-population results; Sections 5–7 completed)
+
+Summary: For the **1,970-store synthetic planning instance**, the best service-feasible design found has **11 DCs and 183 owned vehicles**. D28 monthly cost is **KRW 1.744625 billion**; H14 cost with the D28 fleet fixed is **KRW 1.747216 billion**. Held-out saving against the constructed historical baseline is **KRW 2.450571 billion/month (58.38%)**, with a conditional 95% paired-bootstrap interval **[2.431567, 2.462733] billion**. About **96.76% of that saving is eliminated modelled stockout penalties**, so it is not a bankable cash-saving estimate. The result uses the revised **290 km** route limit rather than the original 250 km. The untested density/thinning approximation remains the principal structural simplification; the route-limit relaxation and synthetic baseline are additional material limits.
+
+Files: this document; [higher-level solver](../higher_level/README.md); [daily router](../lower_level/README.md); [saved full-run report](../code/results/higher_level/report.json); [recommended network](../code/results/higher_level/recommended.json). The client proposal is Section 6; no separate proposal file is asserted.
+
+LLM tools and use: Claude (Anthropic, Sonnet 5.5), 2026-10-27 — structuring the problem (boundary, decisions, dependencies, classification) and drafting Sections 1–4 (2026-10-27 and 2026-10-28; Section 3 external facts checked by web search, sources cited beside the claims). Implementation and documentation assistance in this conversation: Codex (OpenAI), 2026-10-29. Section 7 contains three explicitly illustrative review discussions grounded in saved evidence; they are not verbatim transcripts.
+
+Marking: `[ASSUMPTION]` = modelling choice; **R** = measured or directly recorded result; **P / Not run** = planned work without a saved result; `TBD` = a genuinely unresolved fact; `N/A — reason` = inapplicable. Monetary results apply to the synthetic 1,970-store instance and are monthly equivalents unless stated otherwise.
 
 ## 1. Decision, Scope & Problem Structure
 
@@ -20,7 +24,7 @@ Marking: `[ASSUMPTION]` = assumption; `TBD` = unresolved fact (carried to the Se
 
 | Statement | Level | Decision or component it concerns | Consequence for comparison |
 |---|---|---|---|
-| Strategy & Planning: "Cut the DCs from twelve to eight and lease and staff costs fall sharply." | **Evaluation of a decision** (one term only) | `site-selection` at k = 8; component `dc-fixed-cost` | True by construction for one cost term (fixed cost is linear in the number of open sites). It says nothing about total cost, so it cannot be compared with anything until the other terms are added. Same unit as Delivery Operations: KRW per month. |
+| Strategy & Planning: "Cut the DCs from twelve to eight and lease and staff costs fall sharply." | **Evaluation of a decision** (one term only) | `site-selection` at k = 8; component `dc-fixed-cost` | Fixed cost is linear in site indicators, but prices differ: the selected 11 sites cost 334.550 M KRW/month versus 326.695 M for the 12-site baseline. Fewer sites did not reduce this term in the measured run. Only total monthly cost resolves the claim. |
 | Delivery Operations: "Fewer DCs means longer routes, more vehicles; it may end up costing more." | **Evaluation of a decision** (the complementary terms), stated as a hypothesis about sign and size | `site-selection` → `store-assignment` → `daily-routing`; components `vehicle-fixed-cost`, `fuel-cost`, `spot-hire-cost`, `failure-cost` | Directly commensurable with Strategy & Planning: both are terms of the same total monthly cost `E(k)`. Neither claim is decided alone; only their sum over k (the sweep) answers whether the saving is outweighed. |
 | Data Team: "The volume-weighted centre of gravity is the optimal site; it takes minutes." | **Method for taking a decision** (candidate generation, the cheap criterion `G`) carrying an unverified validity claim ("optimal") | `site-selection`, via `G` | A method is judged by what the full evaluation `E` says about its output, not by its own score: prediction quality (how well `G` predicts `E`) and decision quality (how much the `G`-best candidate loses under `E`). It is compared with other generators and selection rules at the same budget, not with the cost claims. It does not choose k, and ignores capacity bounds, assignment, vehicle limits and the window. |
 | Field Manager: "The centre of gravity may land across the river; trucks drive to the bridge." | **Claim about the validity of a model** (the distance component) | Road distances `l_uv` feeding `fuel-cost`, `route-limits`, `noon-share`, `pair-eligibility`, `assignment-proxy` and `G` | Not a cost and not a decision, so it has no common scale with the other three. It is a validity condition on all of them: tested by the calibration error of distances against road values and by the `G`–`E` gap. It also supports restricting sites to leasable candidates and computing `G` on road rather than map distance. |
@@ -37,7 +41,7 @@ Marking: `[ASSUMPTION]` = assumption; `TBD` = unresolved fact (carried to the Se
   - Multiple trips per vehicle, driver breaks, time-of-day traffic, dock congestion, stock or backlog carried between days (details in 2a).
   - Opening and closing of stores during the horizon: the store set is fixed.
   - Transition cost of closing or opening a DC. The recommendation is not a migration plan.
-- **Current practice versus constructed baseline.** The company's actual practice (12 DCs, historical assignment, experience-based routes) is unknown here; no real data exist (`TBD`). The **baseline** is constructed: the 12 generated current sites with the generated historical assignment, scored by the same `E`, the same sampled days and the same routing method as every candidate. The baseline is exempt from the capacity bounds. A second reference, the same 12 sites with the assignment re-solved, separates the saving from re-assignment from the saving from changing the network.
+- **Current practice versus constructed baseline.** The company's actual practice (12 DCs, historical assignment, experience-based routes) is unknown here; no real operational data are available for this fictional company. The **baseline** is constructed: the 12 generated current sites with the generated historical assignment, scored by the same `E`, the same sampled days and the same routing method as every candidate. The baseline is exempt from the capacity bounds. A second reference attempts to re-solve assignment at the same 12 sites. In this run it is infeasible for 123 stores, so it cannot separate assignment-only savings from network-change savings.
 
 ### Decisions and dependencies
 
@@ -98,11 +102,11 @@ graph TD
         SS("<b>site-selection</b><br/>(Which candidate sites are open)")
         FP("<b>fleet-policy</b><br/>(Quantile of daily vehicle need)")
         SA("<b>store-assignment</b><br/>(Which open DC serves each store)")
-        
+
         %% SS i FP nie mają między sobą bezpośredniej zależności decyzyjnej
         %% Niewidoczne połączenie wymusza, by były renderowane obok siebie
         SS ~~~ FP
-        
+
         %% SS wpływa bezpośrednio na SA
         SS ==>|"feasible-region<br/>parameter"| SA
     end
@@ -119,7 +123,7 @@ graph TD
     DR -.->|"evaluated_by<br/>(vehicle/fuel/spot/failure costs)"| SS
     DR -.->|"evaluated_by<br/>(vehicle/fuel/spot/failure costs)"| FP
     DR -.->|"evaluated_by<br/>(assignment-proxy)"| SA
-    
+
     %% Style dla większej czytelności
     classDef decision fill:#e1f5fe,stroke:#0277bd,stroke-width:2px;
     class SS,FP,SA,DR decision;
@@ -133,7 +137,7 @@ graph TD
 
 ### 2a · The lower level — one DC's daily operation
 
-**Given** (for DC `j` and day `d`): the stores `I` assigned to `j` (`n = card(I)`); demand `q_i` in roll cages for each store on that day (a sampled day); road distance `l_uv` (km) between nodes (node 0 is the DC), symmetric `[ASSUMPTION]`; travel time `t_uv = 60·l_uv / v` minutes with `v = 35 km/h`; stop time `s = 15 min`; departure `τ0 = 05:00` for all vehicles `[ASSUMPTION]` (the brief allows 04:00–07:00; `TBD` with Delivery Operations); owned fleet `N` (a parameter passed down; `N = 0` in the sizing pass, see 2b); limits `Q = 48` cages, `M = 25` stops, `L = 250` km, route duration `T = 10 h` `[ASSUMPTION]` (loading treated as outside this duration; if loading counts inside the 10-h shift, `T` falls to about 9 h; `TBD`); noon budget `α = 2%`; rates `c_f = 350` KRW/km, `c_s = 550,000` KRW per spot truck-day, `p_14 = 120,000` KRW per delivery after 14:00, `p_so = 500,000` KRW per undelivered store; optional spot-truck availability cap `κ` (base run: no cap, `TBD`).
+**Given** (for DC `j` and day `d`): the stores `I` assigned to `j` (`n = card(I)`); demand `q_i` in roll cages for each store on that day (a sampled day); road distance `l_uv` (km) between nodes (node 0 is the DC), symmetric `[ASSUMPTION]`; travel time `t_uv = 60·l_uv / v` minutes with `v = 35 km/h`; stop time `s = 15 min`; departure `τ0 = 05:00` for all vehicles `[ASSUMPTION]` (the brief allows 04:00–07:00; `TBD` with Delivery Operations); owned fleet `N` (a parameter passed down; `N = 0` in the sizing pass, see 2b); limits `Q = 48` cages, `M = 25` stops, `L = 290` km in the recorded configuration (original specification: 250 km), route duration `T = 10 h` `[ASSUMPTION]` (loading treated as outside this duration; if loading counts inside the 10-h shift, `T` falls to about 9 h; `TBD`); noon budget `α = 2%`; rates `c_f = 350` KRW/km, `c_s = 550,000` KRW per spot truck-day, `p_14 = 120,000` KRW per delivery after 14:00, `p_so = 500,000` KRW per undelivered store; optional spot-truck availability cap `κ` (recorded run: no cap; real market availability remains `TBD`).
 
 **Route set.** `R` is the set of feasible routes `r = (0, i_1, …, i_m, 0)`, each satisfying `Σ q_i ≤ Q`, `m ≤ M`, `len(r) ≤ L`, `duration(r) ≤ T`. Arrival at the h-th stop is `a_{i_h} = τ0 + t_{0,i_1} + Σ_{g<h} (s + t_{i_g,i_{g+1}})` (minutes since midnight). Let `n12(r)` and `n14(r)` count stops with `a > 12:00` and `a > 14:00`.
 
@@ -149,14 +153,14 @@ s.t. Σ_{r ∋ i} λ_r + u_i = 1          for every store i       (served once o
      λ_r, u_i ∈ {0,1}
 ```
 
-This is a set-partitioning vehicle-routing problem with side constraints (capacity, stops, distance, duration and a time-window budget). It is combinatorial (NP-hard), so the solution method is a heuristic chosen in Section 4. Cost per solve and measured accuracy: `TBD` (Section 4).
+This is a set-partitioning vehicle-routing problem with side constraints (capacity, stops, distance, duration and a time-window budget). It is combinatorial (NP-hard), so the solution method is a heuristic chosen in Section 4. Recorded evaluation timings and a development microbenchmark are reported in Sections 4.3 and 5; the larger exact-solver accuracy study has not been run.
 
 **Modelled and omitted.**
 
 | Feature | Treatment | Reason / consequence |
 |---|---|---|
-| Load, stops, distance, duration limits | Modelled (hard) | Core of the brief. With τ0 = 05:00 the clock (7 h to noon, 15 min per stop) binds before the 25-stop limit; which limit binds is itself a result to report. |
-| Stop time and constant road speed | Modelled (15 min, 35 km/h) | Brief's defaults; 30–45 km/h tested as sensitivity. |
+| Load, stops, distance, duration limits | Modelled (hard) | Core of the brief. With τ0 = 05:00, travel can make time to noon bind before 25 stops. A binding-constraint frequency is not available in the saved network summaries. |
+| Stop time and constant road speed | Modelled (15 min, 35 km/h) | Brief's defaults; the 30–45 km/h sensitivity remains Not run. |
 | Single vehicle type, one trip per vehicle | Modelled | A second trip would lower vehicles needed in dense territories; fleet need is overstated there. Omitted for tractability. |
 | Driver breaks | Omitted | Would shorten feasible routes (understates vehicles). Not in the brief. |
 | Time-of-day traffic | Omitted | Peak slowdowns flatter long routes; speed sensitivity partly covers it. |
@@ -165,47 +169,49 @@ This is a set-partitioning vehicle-routing problem with side constraints (capaci
 | Fresh-food second wave | Out of scope | Per brief. |
 | Carry-over between days | Omitted `[ASSUMPTION]` | Makes `daily-routing` Stateless; to confirm. |
 
-**How the delivery window enters.** Hybrid, stated explicitly. The 98%-before-noon requirement is a **hard side constraint per DC-day** (`α = 2%`), which is a conservative sufficient condition for the chain-wide 98% (`TBD`: whether the company means per DC or chain-wide). Delivery after 14:00 and non-delivery are **penalised** (soft, 120,000 and 500,000 KRW). The realised chain-level share before noon is reported for every network. Because the noon constraint is on the routes, a larger territory needs more vehicles, which is the mechanism behind Delivery Operations' claim.
+**How the delivery window enters.** Hybrid, stated explicitly. The 98%-before-noon requirement is a **hard side constraint per DC-day** (`α = 2%`), with the additional acceptance test below to conservatively enforce chain-wide 98% (`TBD`: whether the company means per DC or chain-wide). Delivery after 14:00 and non-delivery are **penalised** (soft, 120,000 and 500,000 KRW). The realised chain-level share before noon is reported for every network. Because the noon constraint is on the routes, a larger territory needs more vehicles, which is the mechanism behind Delivery Operations' claim.
+
+**As implemented.** The routing hard bound counts delivered stops after noon. Upper-level acceptance additionally requires `n12 + unserved ≤ floor(0.02 n)` for every DC-day and at least 98% of all assigned stores delivered before noon on every sampled chain-day. An undelivered store is a service failure; `status=ok` alone does not establish compliance. Every assigned store, including a zero-cage store, requires a visit or an explicit failure. The 290 km setting is a model revision, not evidence of compliance with 250 km.
 
 **One solve returns upward** (per DC-day): vehicles needed `V`, kilometres, stops per route, `n12`, `n14`, undelivered stores `u`, spot trucks `σ`, and the operating cost.
 
 ### 2b · The connection
 
-**Passes down:** the open set `S`, the fleet policy `q`, and the sampled demand days `D` (posterior-predictive draws, shared across all candidates and the baseline as common random numbers, so differences are not sampling noise). The assignment `A_j` is derived inside the evaluation from `S`.
+**Passes down:** the open set `S`, the fleet policy `q`, and the sampled demand days `D` (posterior-predictive draws, shared across all candidates and the baseline as common random numbers, to reduce sampling noise in differences). The assignment `A_j` is derived inside the evaluation from `S`.
 
 **Passes up:** per DC-day `V`, km, `n12`, `n14`, `u`, `σ`; aggregated into expected monthly operating cost, owned vehicles and realised service level.
 
 **One evaluation `E(S, q)`:**
 
 1. Solve the assignment LP for `S` (reject `S` with the reason if infeasible).
-2. **Sizing pass:** for each `j ∈ S` and `d ∈ D`, solve the lower level with `N = 0` (every vehicle priced as a spot truck, so vehicles are minimised first) and record `V_{j,d}`.
+2. **Sizing pass:** for each `j ∈ S` and `d ∈ D`, solve the lower level with `N = 0` (every used vehicle priced as a spot truck, with fuel and failure penalties still in the objective) and record `V_{j,d}`.
 3. `N_j = ceil(Q_q({V_{j,d}}))`, the `q`-quantile of daily need (`fleet-rule`; `q = 2/3` default), weighted by the sampled-day weights `ω_d` (Section 3.4).
-4. **Accounting:** spot trucks `σ_{j,d} = max(0, V_{j,d} − N_j)`, with the routes of step 2 frozen `[ASSUMPTION]`. This ignores that free owned vehicles could shorten routes, so cost is slightly overstated; to be checked on a small instance (Section 4).
+4. **Accounting:** spot trucks `σ_{j,d} = max(0, V_{j,d} − N_j)`, with the routes of step 2 frozen `[ASSUMPTION]`. This omits re-optimization after vehicles become owned. Its difference from an owned-fleet reoptimization policy has not been quantified; the reported comparisons consistently use frozen routes.
 5. `E = F(S) + c_v·ΣN_j + D_m · Σ_d ω_d Σ_j [c_f·km + c_s·σ + p_14·n14 + p_so·u]`, with `D_m = 30.4` days per month `[ASSUMPTION]` and day weights `ω_d` summing to 1 (equal when dates are drawn uniformly; stratified weights in Section 3.4).
 
-**Cost of one evaluation:** `k · card(D)` lower-level solves plus one assignment LP. With 7 sampled days, k = 8 gives 56 solves. With 28 days, 224; the 14 held-out days add 112; the baseline costs 12 × (28 + 14) = 504 solves. The cost per solve is `TBD` (Section 4).
+**Cost of one evaluation:** `k · card(D)` lower-level solves plus one assignment LP. With 7 sampled days, k = 8 gives 56 solves. With 28 days, 224; the 14 held-out days add 112; the baseline costs 12 × (28 + 14) = 504 solves. The selected 11-DC D28 evaluation took 77.366 s for 308 DC-day solves including assignment and matrix work; pure routing timings are distinguished in Section 4.3.
 
-**Where demand uncertainty enters.** Only through `D`, in the lower level: fleet size (an order statistic) and spot hiring are not linear in demand, so an average day would understate both. Sampled days include a chain-wide calendar draw, so costs are correlated across DCs. **Averaged away (simplification):** `store-assignment` and `G` use posterior-mean volumes `w_i`; this goes in the Section 4 table. The fleet is sized and scored on the same sampled days, which is optimistic for spot cost; the held-out days measure the effect.
+**Where demand uncertainty enters.** Only through `D`, in the lower level: fleet size (an order statistic) and spot hiring are not linear in demand, so an average day can miss their cost. Here the mean-day and D28 owned fleets are equal, while the mean day misses spot cost. Sampled days include a chain-wide calendar draw, so costs are correlated across DCs. **Averaged away (simplification):** `store-assignment` and `G` use posterior-mean volumes `w_i`; this goes in the Section 4 table. The fleet is sized and scored on the same sampled days, which is optimistic for spot cost; the held-out days measure the effect.
 
-**Place of the assignment.** It is a decision (`store-assignment`) but **not part of the searched candidate**; it is re-solved inside each evaluation. Reasons: (i) for fixed `S` it is a transportation problem with bounds (an LP with integral vertices), exact and fast; (ii) putting about 2,000 store-to-DC choices into the candidate would give a search space a few dozen evaluations cannot learn; (iii) every candidate then gets a consistent, reproducible assignment. Cost: the LP minimises a distance proxy (`assignment-proxy`), not route cost, so compact routing and the window can be missed; this feeds the `G`–`E` gap and is a candidate check for Section 4. The baseline keeps its historical assignment (a fact of the operation), hence the second reference with re-solved assignment.
+**Place of the assignment.** It is a decision (`store-assignment`) but **not part of the searched candidate**; it is re-solved inside each evaluation. Reasons: (i) for fixed `S` it is a transportation problem with bounds (an LP with integral vertices), exact and fast; (ii) putting about 2,000 store-to-DC choices into the candidate would give a search space a few dozen evaluations cannot learn; (iii) every candidate then gets a consistent, reproducible assignment. Cost: the LP minimises a distance proxy (`assignment-proxy`), not route cost, so compact routing and the window can be missed; this feeds the `G`–`E` gap and is a candidate check for Section 4. The constructed baseline keeps its generated historical assignment; the attempted second reference re-solves it but is infeasible in this run.
 
 ### 2c · The upper level — how many DCs, and where
 
-**Variables and domains.** `y_j ∈ {0,1}` for each candidate site `j ∈ C` (`card(C)` about 40–80, including the 12 current sites); `k = Σ y_j`; `x_ij ∈ {0,1}` (store `i` served by `j`; derived by the LP, not searched); `q` (fleet quantile, base value 2/3). A **candidate** is `(S, q)`.
+**Variables and domains.** `y_j ∈ {0,1}` for each candidate site `j ∈ C` (`card(C) = 60`, including the 12 current sites); `k = Σ y_j`; `x_ij ∈ {0,1}` (store `i` served by `j`; derived by the LP, not searched); `q` (fleet quantile, base value 2/3). A **candidate** is `(S, q)`.
 
 **Objective and constraints:**
 
 ```text
 min over (y, q):  E(y, q) = Σ_j f_j y_j  +  c_v Σ_j N_j(y, q)  +  D_m · E_d [ Σ_j Φ_j(A_j(y), d, N_j) ]
-                  where Φ_j is the optimal value of the lower level (2a) for DC j on day d
+                  where Φ_j is the ideal lower-level value (2a); the implementation uses heuristic sizing routes and frozen-route accounting (2b)
 
 s.t. Σ_j x_ij = 1                         every store assigned once
      x_ij ≤ y_j,  x_ij ≤ elig_ij          only open sites; eligibility (a single-store route meets noon and the km/duration limits)
      min_j · y_j ≤ Σ_i x_ij ≤ max_j · y_j  store-count bounds per open DC (new designs only; baseline exempt)
-     realised share of deliveries before 12:00 ≥ 98%   (implied by the per-DC-day noon budget; reported)
+     realised share of deliveries before 12:00 ≥ 98%   (tested per chain-day and DC-day, with unserved stores counted as failures)
 ```
 
-**Feasible range of k.** With `n` stores and the default bounds (500–1,400 stores per DC, scaled in proportion if thinned), `ceil(n/1,400) ≤ k ≤ floor(n/500)`. For n = 10,000 (and for 2,000 with bounds 100–280) this gives **8 ≤ k ≤ 20**. So Strategy & Planning's proposal of 8 is the smallest feasible network under these bounds, with every DC near its maximum. Site-specific `max_stores` can raise the minimum. The sweep covers this range; k = 8 is the natural boundary test case.
+**Necessary range of k, with observed status.** For 1,970 active stores, 100-store minima and site maxima of 200/280, the capacity-based range is **8 ≤ k ≤ 19**. This alone does not certify feasibility. The recorded p-median MIP **proved k=8 infeasible**. At **k=9**, the 20 s time limit expired without an incumbent and the fallback found no feasible seed: status is **unknown, not proven infeasible**. Seeds were obtained for k=10–19. k=10 has an accepted D28 design; k=11 is the lowest-cost accepted design found, not the minimum demonstrated feasible count. [Feasibility](../code/results/higher_level/feasibility.json), [pool certificates](../code/results/higher_level/pool.json), [sweep](../code/results/higher_level/sweep.json).
 
 **Convex or linear, and combinatorial.**
 
@@ -221,7 +227,7 @@ s.t. Σ_j x_ij = 1                         every store assigned once
 | Input | `stores` | `store_id`, `region`, `lat`, `lon`, `store_type`, `opened_on`, `closed_on`, `current_dc_id` | text; text; decimal degrees; enum (residential / office / mixed / roadside); date; date or null; text | one store (all stores, or the thinned fraction) |
 | Input | `demand_history` | `store_id`, `date`, `cages_ordered` | text; date; integer (roll cages) | one store on one day, last 12 months; feeds the demand model |
 | Input | `dcs` | `dc_id`, `lat`, `lon`, `lease_expires_on`, `monthly_fixed_cost`, `max_stores`, `min_stores` | text; degrees; date; KRW; integer | one current DC (12 rows) |
-| Input | `candidate_sites` | `site_id`, `lat`, `lon`, `monthly_fixed_cost`, `max_stores` | text; degrees; KRW; integer | one leasable site, 40–80, including the 12 current ones |
+| Input | `candidate_sites` | `site_id`, `lat`, `lon`, `monthly_fixed_cost`, `max_stores` | text; degrees; KRW; integer | one synthetic candidate site, 60 rows, including the 12 current ones; real leasability unverified |
 | Input | `cost_parameters` | name, value, unit | fuel 350 KRW/km; vehicle 5.5 M KRW/month; spot 550,000 KRW/day; late 120,000 KRW; stock-out 500,000 KRW; capacity 48 cages | one parameter |
 | Input | model parameters | `v`, `s`, `τ0`, `T`, `M`, `L`, `α`, `q`, `D_m`, `κ`, thinning fraction, sampled-day counts (7 / 28 / 14), `B` (default 40), seeds | km/h; min; clock time; h; count; km; share; share; days; count; fraction; counts; count; integer | one scalar setting |
 | Input | `road_distance` cache (ours) | `from_id`, `to_id`, `km`, `source` | text; text; km; enum (engine / calibrated detour) | one point pair; source, version, extract date stated in Section 3 |
@@ -232,13 +238,13 @@ s.t. Σ_j x_ij = 1                         every store assigned once
 | Output | sweep | `k`, best `E`, `F`, operating cost | integer; KRW/month | one number of DCs |
 | Output | `G`-versus-`E` table | candidate, `G`, `E` | KRW/month | one evaluated candidate |
 | Output | lower-level run | route id, store sequence, km, stops, arrival times, late flags, vehicles, spot | mixed | one route on one DC-day |
-| Output (baseline history) | `deliveries`, `vehicle_days`, `spot_hires` | as in the brief's Section 2.5 | as in the brief | produced by running our own lower level on the current network, and labelled so |
+| Output (baseline history) | `deliveries`, `vehicle_days`, `spot_hires` | as in the brief's Section 2.5 | as in the brief | planned separate tables; this run records equivalent simulated aggregates in evaluation JSONs |
 
 ### The two criteria
 
 - **Full evaluation `E(S, q)`:** fixed cost + vehicle cost + `D_m` × the `ω_d`-weighted mean over sampled days of [fuel + spot + failure cost], with the assignment re-solved, the lower level solved for every DC on every day, and the fleet from the quantile rule (procedure in 2b). Expensive: `k · card(D)` routing solves per candidate; with the real routing system it would take hours.
-- **Generation criterion `G(S) = F(S) + λ · P(S)`:** `P(S)` is the capacitated p-median assignment cost on **road** distances weighted by posterior-mean volume (the `assignment-proxy` value), and `λ` (KRW per cage-km per month) is a scale constant, calibrated on the evaluated candidates (Section 4). Cheap: one LP, or a MIP for the G-best set for each k.
-- **What `G` ignores:** route sequencing (star distance replaces tour length), the 25-stop / 250-km / 48-cage limits and therefore the vehicle count, the stop time and the noon window, the fleet quantile and spot hiring, penalties for failures, demand variability (it uses means), and that the assignment minimises distance rather than route cost.
+- **Generation criterion `G(S) = F(S) + λ · P(S)`:** `P(S)` is the capacitated p-median assignment cost on **road** distances weighted by posterior-mean volume (the `assignment-proxy` value), and `λ` (KRW per cage-km per month) is a scale constant, calibrated on the historical baseline (Section 4.3). Cheap: one LP, or a MIP for the G-best set for each k.
+- **What `G` ignores:** route sequencing (star distance replaces tour length), the 25-stop / 290-km / 48-cage limits and therefore the vehicle count, the stop time and the noon window, the fleet quantile and spot hiring, penalties for failures, demand variability (it uses means), and that the assignment minimises distance rather than route cost.
 
 ### Components
 
@@ -250,10 +256,10 @@ Roles and Models are kept separate (reference, Section 3). There is **no State-t
 | `vehicle-fixed-cost` | `fleet-policy` | Cost (minimise) | Formulation | `c_v · Σ_j N_j`, KRW/month; 5.5 M per vehicle including driver. |
 | `fleet-rule` | `fleet-policy` | Constraint | Formulation | `N_j = ceil(Q_q({V_{j,d}}))` over sampled days; `q = 2/3` default. Uses sizing-pass outputs from `daily-routing`; an in-sample estimate. |
 | `fuel-cost` | `daily-routing` | Cost (minimise) | Formulation | `c_f · Σ_r len(r) λ_r`, KRW/day; 350 KRW/km on cached road distances. |
-| `spot-hire-cost` | `daily-routing` | Cost (minimise) | Formulation | `c_s · max(0, V − N)`, KRW/day; 550,000 KRW per truck-day; cap `κ` `TBD`. |
+| `spot-hire-cost` | `daily-routing` | Cost (minimise) | Formulation | `c_s · max(0, V − N)`, KRW/day; 550,000 KRW per truck-day; no cap in the recorded run; real availability remains `TBD`. |
 | `failure-cost` | `daily-routing` | Cost (minimise) | Formulation | `p_14 · (deliveries after 14:00) + p_so · (undelivered)`, KRW/day. |
 | `load-limit` | `daily-routing` | Constraint (hard) | Formulation | `Σ q_i ≤ 48` cages per route; `q_i` from the posterior predictive. |
-| `route-limits` | `daily-routing` | Constraint (hard) | Formulation | At most 25 stops, 250 km, and duration `≤ T`; stop time 15 min, speed 35 km/h. |
+| `route-limits` | `daily-routing` | Constraint (hard) | Formulation | At most 25 stops, 290 km, and duration `≤ T`; stop time 15 min, speed 35 km/h. |
 | `noon-share` | `daily-routing` | Constraint (hard) | Formulation | At most `floor(0.02 n)` stores arrive after 12:00 per DC-day; arrivals from the recursion in 2a. |
 | `cover-once` | `daily-routing` | Constraint (hard) | Formulation | Each store is visited once or counted as undelivered. |
 | `capacity-bounds` | `store-assignment` | Constraint (hard) | Formulation | Store count of each open DC between `min_j` and `max_j` (scaled if thinned); baseline exempt. |
@@ -275,50 +281,48 @@ Roles and Models are kept separate (reference, Section 3). There is **no State-t
 
 ## 3. Information & Uncertainty
 
-**Status.** No code has been written or run as of v0.2. Everything below is a specification of what will be generated and measured. Numbers are one of: *design value* (a choice I make), *illustrative arithmetic* (checkable by hand, not a result), or `TBD` (to be measured). There are no measured results yet. Section references "brief 2.5" and "brief 2.7" follow the template's wording for the distance routes and for thinning the chain.
+**Status (R, 2026-10-29).** Demand fitting, distance calibration and the full 1,970-store optimization have saved results. Sections 3–5 distinguish these from the earlier design plan. Sources are [report.json](../code/results/higher_level/report.json), [demand model](../code/demand/model.json), [calibration](../code/cache/detour_model.json) and [OSRM metadata](../code/cache/osrm_meta.json). Facts absent from the artifacts remain unresolved; configuration choices are not confirmations from a real client.
 
 ### 3.1 The instantiated data
 
-All tables are generated from one master seed (`SEED = 437`) split into independent sub-seeds with `numpy.random.SeedSequence.spawn` (data, demand history, distances sample, planning days, search, control). Geography is South Korea's mainland `[ASSUMPTION]` (the brief's costs are in KRW); Jeju is excluded because it has no road link to the mainland. Every number below is fictional unless a source is cited.
+The executed instance uses synthetic South Korean geography and master seed 437. The generator uses one RNG stream for tables/history; calibration, planning days and search/control use named `SeedSequence` branches. The original claim that every generation component already had an independent sub-seed is not supported by [generate.py](../generator/generate.py).
 
-| Table | How generated (distribution, parameters, seed) | Real-world property reflected |
+| Table / artifact | Recorded implementation and counts | Consequence |
 |---|---|---|
-| `stores` (10,000 generated, 1-in-5 kept) | Location mixture: about 20 urban clusters (weights proportional to metro population, scatter 6–15 km by city size) plus a 10% rural component. The capital-region clusters are weighted to sum to about 51%, matching the share of the national population living there on about 12% of the area ([Korea Business Review](https://www.koreabizreview.com/en/articles/kbr-legacy-7797)). Points that cannot be snapped to a road within 500 m are rejected. Types: residential 45%, office 20%, mixed 25%, roadside 10%, with office and mixed more likely near city cores and roadside in the rural component. About 4% of stores opened and 2% closed within the last 12 months; the rest opened 1–15 years ago. `current_dc_id` is the nearest current DC. Thinning keeps a stratified 1-in-5 sample by cluster (about 2,000 stores). | Heavy concentration around one metropolis, many mid-size cities, a sparse rural remainder, rivers that force detours, and a few short-history stores. |
-| `demand_history` (12 months to 2026-10-27) | Store daily mean `θ_i` (cages per day): log-normal around the type mean, sigma 0.5, clipped to [0.5, 6], chain mean about 2.2 (design values). Daily demand `y_it ~ NegBin` with mean `θ_i · e_{g,t}` and day-level overdispersion (CV 0.25 for the daily shock). Calendar factor `e_{g,t} = ω_{g,weekday} · σ_month · η_holiday`: residential and roadside higher on weekends, office lower; summer peak of about +15%; holiday and pre-holiday spikes of about ×1.2–1.5 on about 15 days a year (dates from the official public-holiday list for the window, cited when generated, `TBD`). All factors are normalised to mean 1. | Store-to-store heterogeneity, weekday patterns that differ by store type, a seasonal cycle, chain-wide holiday spikes, and noise beyond Poisson. |
-| `dcs` (12 current) | Chosen from the candidate sites by a capacitated 12-median on map distance for the store set of about 15 years ago (stores older than 5 years), then three DCs are moved to another candidate within 30 km. Monthly fixed cost 30 M KRW × site multiplier (see below); `max_stores` 280, `min_stores` 100; `lease_expires_on` spread over the next 1–6 years. | A chain that grew in stages: sensible but not optimal, with lock-in. This avoids a strawman baseline that is too good or too bad. |
-| `candidate_sites` (60, including the 12 current) | Sampled from OSM motorway junctions that have industrial land use within 5 km (via `osmium` on the extract below), spread by farthest-point sampling weighted by store density, at least two per macro-region. Fixed cost 30 M KRW × multiplier (capital region 1.3, other metropolitan cities 1.1, elsewhere 0.9, ±10% noise). `max_stores` 280 for three quarters of the sites and 200 for the rest; `min_stores` 100. If a junction/industrial join is too sparse, fall back to road-snapped points near store density and label them as synthetic. | Logistics sites sit near motorway access and industrial zones; land and labour cost more near the capital; some sites are smaller. |
-| `cost_parameters` | As given in the brief (fuel 350 KRW/km, vehicle 5.5 M KRW/month, spot 550,000 KRW/day, late 120,000 KRW, stock-out 500,000 KRW, 48 cages). The fixed cost (150 M KRW per DC at full scale) and the store-count bounds (500–1,400) are scaled by the thinning fraction 0.2 to 30 M and 100–280. Vehicle, fuel, spot and penalty rates are not scaled. | Per-unit costs do not change when I sample fewer stores. |
-| `deliveries`, `vehicle_days`, `spot_hires` | Not drawn independently. They are produced by running my own lower level on the baseline network over simulated history days and labelled as model output. | Gives the baseline a consistent, reproducible history. |
+| [stores](../data/stores.csv) | 2,000 generated rows; 1,970 active planning stores. All-row regions: capital 1,013, other-metro 777, rural 210. Types: residential 895, office 404, mixed 493, roadside 208. Broad coordinate mixtures replace the proposed 20-cluster road-snapped generator. | Thirty inactive stores are excluded. Synthetic geography requires validation before deployment. |
+| [demand history](../data/demand_history.csv) | 714,255 store-day observations, 2025-10-28 to 2026-10-27. Log-normal type rates use sigma 0.45, clipped to [0.5,6]; counts are **Poisson**, not the proposed overdispersed negative-binomial generator. | The observed residual-dispersion check determines the fitted likelihood. |
+| [current DCs](../data/dcs.csv) | Twelve randomly selected candidates; historical assignment uses nearest generated coordinates. The proposed historical capacitated 12-median plus relocations was not implemented. | The baseline is not evidence of competent real historical practice; this materially affects savings. |
+| [candidate sites](../data/candidate_sites.csv) | Sixty synthetic sites, including the current twelve. Forty-seven have maximum 280 stores and thirteen maximum 200; ordinary minimum 100. Base fixed cost 30 M KRW with location multipliers/noise. | Availability, motorway access and industrial land use are not verified. The proposed OSM-based site selection is not claimed as executed. |
+| [cost parameters](../data/cost_parameters.csv), [configuration](../config.py) | Fuel 350 KRW/km; owned vehicle 5.5 M/month; spot 550,000/day; after-14:00 penalty 120,000; stockout penalty 500,000/store; capacity 48 cages. Executed maximum **290 km**, speed 35 km/h, 15-minute stops, departure 05:00, duration 600 min. | Nationwide tables/model/day files determine instance size. Legacy configuration values of 160 stores, two DCs, 50–120 store bounds and 3/5/3 day counts do not describe this run. |
+| Baseline operation outputs | Daily fleets, unserved counts, kilometres and costs are in evaluation JSONs. Separate actual-company `deliveries`, `vehicle_days` and `spot_hires` tables are not supplied. | Baseline operation is model output, not observation. |
 
-**Scale of the instance and what changes at full scale.** The instance has about 2,000 stores, 12 current DCs and 60 candidate sites; each DC serves 100–280 stores. At full scale n = 10,000 and each DC serves 500–1,400. Illustrative arithmetic: store–store pairs within a fixed radius grow about 25× (5× the stores at 5× the density), site–store pairs 5×, each lower-level solve involves about 5× more stores, and kilometres per store should fall by about `√5 ≈ 2.2` (spacing shrinks with the square root of density). The feasible range of k does not change (`ceil(n/280) = ceil(2,000/280) = 8` and `floor(2,000/100) = 20`, the same as at full scale). With 200-store sites, k = 8 is feasible only if at most three of the eight open sites are small (`2,240 − 80s ≥ 2,000` gives `s ≤ 3`, if n = 2,000 exactly). Solve time per DC-day at full scale is `TBD`; it is expected to grow faster than linearly in n, which is why the full run uses the thinned instance.
+**Scale/extrapolation.** The original target was φ=0.2 of a 10,000-store chain; the program directly generates 2,000 synthetic stores and plans for 1,970 active ones. It does not provide a measured full-density 10,000-store comparison. The 8–20 count range at n=2,000 becomes 8–19 at n=1,970. The square-root spacing argument remains theoretical. Full-density solve time and the stability of k at real stop density remain **TBD / Not measured**.
 
 ### 3.2 Distances
 
-**Route taken (brief 2.5): a mixture.**
+The [offline lookup](../distances/lookup.py) uses engine distances for site–store pairs and store–store pairs within 60 km, with calibrated haversine multipliers for uncached long store–store legs.
 
-- **Engine values** from a self-hosted OSRM for (a) every candidate-site × store pair (about 60 × 2,000 = 120,000 pairs) and (b) every store–store pair within `R = 60` km (my choice, so that nearly all legs of a route are covered).
-- **A calibrated detour model** (haversine distance × a ratio) only for the few store–store legs beyond `R`.
-
-**Why self-hosted.** The public demo server is restricted to reasonable non-commercial use at no more than one request per second and gives no guarantees ([OSRM demo-server page](https://github.com/Project-OSRM/osrm-backend/wiki/Demo-server)). Arithmetic: 120,000 single-pair requests at 1 per second would take about 33 hours.
-
-| Item | Specification |
+| Item | Recorded evidence and remaining limit |
 |---|---|
-| Road data | OSM extract of South Korea from Geofabrik (`asia/south-korea-latest.osm.pbf`), normally updated daily ([Geofabrik](https://download.geofabrik.de); [South Korea extract page](https://download.geofabrik.de/asia/south-korea.html)). The download date and file hash are written to `code/cache/osrm_meta.json` at build time (`TBD`). |
-| Engine and version | OSRM `osrm-backend`, built with `osrm-extract -p car.lua`, `osrm-partition`, `osrm-customize`, served with `osrm-routed --algorithm mld` ([OSRM README](https://github.com/Project-OSRM/osrm-backend)). The releases page lists v5.27.1 as the latest listed release at the time of searching ([releases](https://www.github.com/Project-OSRM/osrm-backend/releases)); the version actually installed is pinned at build and recorded in `osrm_meta.json` (`TBD`). |
-| Vehicle profile | The default car profile (`car.lua`). Only its **distance** is used; time is my own constant speed (35 km/h) plus stop time. `[ASSUMPTION]` Truck restrictions (height, weight, banned roads) are not modelled, so distances can be slightly short for some legs. |
-| Resolution | Exact store and site coordinates, snapped to the nearest road by the engine; the snap distance is stored, and the 500 m rejection rule is applied at generation. No grid aggregation. |
-| Pairs computed | About 120,000 site–store pairs and a few hundred thousand store–store pairs within `R`, via the engine's table service in batches. The exact count and run time are `TBD`. Distances are assumed symmetric `[ASSUMPTION]` (one-way streets ignored). |
-| Cache | `code/cache/road_distance.parquet`, one row per unordered pair `(from_id, to_id, km, source)` with `source` either `engine` or `detour`, plus `osrm_meta.json`. The experiments read only the cache. |
-| Calibration of the detour model | 1,000 random pairs queried from the engine, stratified by map-distance band (0–10, 10–30, 30–60, 60–150, over 150 km) and by area (capital region, other metropolitan, rural), **including pairs that cross a large river** (the Field Manager's concern). The ratio road/haversine is fitted per band and area on 70% of the sample; mean absolute percentage error and bias are reported on the other 30%. Error on the calibration sample: `TBD` (Not run). |
+| Engine/cache | [OSRM metadata](../code/cache/osrm_meta.json): car-profile engine, extract date 2026-10-29, **1,186,390 directed records**, 60 km store–store radius, **543.7 s** build time. Both directions are stored under symmetry; these are not that many unique unordered pairs. |
+| Extract/version audit | Original OSM PBF hash/download audit and installed OSRM version are absent: **TBD**. The report's Parquet hash identifies the cache, not the original road extract. |
+| Vehicle/time model | Car-profile km, symmetric, no truck restrictions; time at 35 km/h plus 15-minute stops. One-way and truck-access effects remain unvalidated. |
+| Snap quality | Calibration rejects snaps beyond 500 m and records replacements. The generator does not establish that every input store/site passes that rule. Calibration acceptance is not a global geography-quality certificate. |
+| Calibration sample | **1,000 valid unique pairs: 700 training / 300 validation**; 925 rejected attempts replaced. Bands 0–10, 10–30, 30–60, 60–150, 150+ km; endpoint-based area labels. Han opposite-bank screening includes river-related endpoints; actual bridge crossings were not verified. |
+| All-band validation | **MAPE 12.2693%, bias +4.1069%, MAE 5.6502 km**, n=300. |
+| Long-pair validation | Beyond 60 km: **MAPE 5.8402%, bias +0.7186%, MAE 10.8255 km**, n=90. These stratified-sample metrics are not weighted by driven-leg frequency. |
+| River-screen validation | **MAPE 14.8016%, bias +9.1077%, MAE 2.8208 km**, n=75; endpoint screening, not verified river-crossing routes. |
+| Long-distance multipliers | At 60–150 km, capital/other-metro/rural: **1.2996 / 1.3839 / 1.3094**. At 150+ km: **1.2958 / 1.2139 / 1.2446**. Fallbacks use training observations only. |
 
-The calibration sample also produces the distribution of road-to-map ratios, which shows directly whether map distance misrepresents road distance for a given pair (Section 1, Field Manager).
+Source: [detour_model.json](../code/cache/detour_model.json). Recorded input hashes match the current store, site, DC, costs, fitted-demand, posterior, Parquet and calibration files. The current 290 km configuration reproduces the report's all-site eligibility counts. The main report lacks a complete routing-parameter snapshot, so this revision is disclosed rather than inferred from `bounds_overridden=false`, which concerns store-count overrides.
 
 ### 3.3 The instance: thinning and placement
 
-- **Fraction kept (brief 2.7):** 1 in 5 (`φ = 0.2`), about 2,000 stores, with a stratified sample by cluster so regional shares are preserved. The reduced run uses `φ = 0.05` (about 500 stores).
-- **Scaling:** DC fixed cost and store-count bounds are multiplied by `φ` (see 3.1) so that fixed cost per store and capacity per store stay as at full scale. Vehicle, fuel, spot and penalty rates are unchanged.
-- **Stop density:** **one stop per sampled store**; stops are not aggregated. Distortion: with 1/5 of the stores, neighbouring stops are about `√5 ≈ 2.2` times farther apart than in the real chain, and the clock (15 minutes per stop, noon window) allows fewer stops per route in the same area. Both inflate operating cost per store. By reasoning from a continuous approximation (not measured), the part that depends on the number of DCs, the line-haul to the territory divided by stops per route, is inflated more, so **the thinned instance should be biased toward recommending more DCs**; a finding that fewer DCs win would therefore be conservative. This is recorded as a row of the Section 4 table and tested on a denser sub-instance (Check 1).
-- **Placing the 12 current DCs and the candidates:** as in 3.1. About half of the current DCs should fall in the capital region, as a result of fitting the store distribution there, not by instruction. Candidates sit near motorway access and industrial land use, where a real chain would look for sites.
+- **Executed population:** 1,970 active stores; the [full-run scope](../code/results/higher_level/report.json) is not the earlier 200-store diagnostic subset and not a measured real 10,000-store operation.
+- **Scaling:** φ=0.2 gives base fixed cost 30 M KRW and ordinary bounds 100–280; thirteen smaller sites have maximum 200. Vehicle, fuel, spot and penalty rates are not scaled.
+- **Density:** each store remains one visit or failure, including zero-cage stores. Thinning changes route geometry and can bias k. The denser capital-region check has **not** been run.
+- **Placement:** synthetic random candidate points, a random current-site subset and coordinate-nearest historical assignment. Proposed motorway/land-use selection and historical 12-median placement remain future improvements.
+- **Route-limit revision:** the original **250 km** setting left eight stores ineligible for every site. The current **290 km** configuration has **zero uncovered stores** in its saved preflight. This is a relaxed operating assumption, not a solve of the original requirement. If 250 km is mandatory, correct/extend candidate coverage and re-evaluate before approval.
 
 ### 3.4 The demand model
 
@@ -335,14 +339,25 @@ planning day d: draw θ_i from the posterior, then y_id ~ Poisson(θ_i · e_{g,d
 - **Calendar effect.** The weekday factors by store type, month factors and holiday factors are estimated **once** for the chain from a Poisson regression with a fixed effect per store on stores with long history. They are then treated as known: their uncertainty is a simplification (Section 4 table).
 - **Prior and its strength.** The prior mean `μ_g` and shape `a_g` come from empirical Bayes: method-of-moments on the estimated rates of stores with at least 300 days of history, with the sampling noise removed. `b_g = a_g / μ_g` is the prior's worth in exposure-days. Illustrative arithmetic (not a result): a between-store CV of 0.5 with mean 2.2 gives `a = 4`, `b ≈ 1.8` days, so a store with 14 days of history has a prior weight of `1.8 / (1.8 + 14) ≈ 11%`.
 - **Short-history stores.** They stay in the model; the posterior is wider and shrinks toward the type mean. Sensitivity with prior strength ×0.5 and ×2 (planned). New-store ramp-up is not modelled (`TBD`, Section 3.5).
-- **Fit check.** Posterior predictive check on the dispersion of daily counts per store. If the variance-to-mean ratio is clearly above 1, the likelihood becomes negative binomial. The generator's day-level overdispersion makes this check informative. Result: `TBD` (Not run).
-- **Planning days.** Calendar dates are drawn stratified by (weekday or weekend) × (season) × (holiday class), with weights `ω_d` equal to the stratum's share of the year divided by the number of sampled days in it. Three disjoint sets of dates: **7 days while searching** (`D7`), **28 days for the final comparison** (`D28`), and **14 held-out days** (`H14`) never used before the final saving estimate. A fourth set of 7 days (`D_dev`) is used only for development. Every set uses one independent draw of `θ` and demand per day, and the same days are shared by every candidate and the baseline (common random numbers). The means and quantile in Sections 2b and 2c are weighted by `ω_d`.
+- **Fit check (R).** Calendar-adjusted long-history Pearson dispersion is **0.9960995**, below the implemented **1.2** fallback threshold. The saved likelihood is **Poisson** and calendar fitting converged in **nine iterations**. This is a residual diagnostic, not a complete posterior-predictive validation or proof of real demand adequacy.
+- **Planning days (R).** Saved `D_dev=7`, `D7=7`, `D28=28` and `H14=14` contain **56 distinct calendar dates**, demand for the same 1,970 stores, and positive weights summing to one within each set. The representative year is 2025-10-28 to 2026-10-27: calendar scenarios, not future observed orders. Thirteen populated weekday/weekend × season × holiday cells are coarsened for small sets, with rare cells merged to support four disjoint sets; seven days cannot cover all original cells. Independent RNG streams generate posterior/predictive shocks, while required date disjointness introduces dependence between calendar selections. Every candidate/reference reuses the saved arrays. [Planning manifest](../code/demand/planning/manifest.json).
 - **Where demand enters a cost.** Through the sampled `q_i^d` in `load-limit`, which drives vehicles `V`, kilometres, the fleet quantile and the spot and failure costs; the posterior-mean `w_i` enters `assignment-proxy` and `G`.
-- **Sampled-day versus average-day evaluation.** Fleet size (an order statistic) and spot hiring are not linear in demand, so a cost computed once at average demand differs from the average of costs over sampled days (Jensen's inequality: for cost functions with this convex-like kink structure the average-day cost is typically lower). The difference is reported for the recommended network **whatever its size**: evaluate it once with average-day demand and compare it with the `D28` figure (Not run).
+- **Sampled-day versus average-day evaluation (R).** The selected network costs **1,732.841 M KRW/month** on the posterior-mean day versus **1,744.625 M** on D28: understatement **11.783 M (0.6754% of D28)**. Both have **183 owned vehicles**. The mean-day approximation has zero spot cost versus 10.953 M on D28; this does not support a claim that its fleet was smaller. The discrete heuristic need not satisfy a global convexity assumption; this is an observed difference. [Report](../code/results/higher_level/report.json).
+
+**Fitted prior/calendar results (R).** There are 1,925 stores with at least 300 history days and 75 shorter-history stores. Gamma parameters use shape/rate.
+
+| Type | Prior mean cages/day | Shape a | Rate b (exposure-days) | Long-history stores |
+|---|---:|---:|---:|---:|
+| mixed | 2.5320 | 5.4992 | 2.1719 | 473 |
+| office | 2.0820 | 4.5345 | 2.1780 | 389 |
+| residential | 2.5393 | 5.2370 | 2.0624 | 862 |
+| roadside | 2.7208 | 5.1220 | 1.8825 | 201 |
+
+Ordinary/pre-holiday/holiday factors are **1.0000 / 0.9985 / 1.3569**. The five supplied dates match the synthetic generator; they are **not** a sourced complete official holiday calendar. Residential Saturday/Sunday factors are 1.1806/1.2008; office factors 0.6198/0.5271. Product exposure is normalized to mean one by store type. Calendar-parameter uncertainty is excluded. [Fitted model](../code/demand/model.json).
 
 ### 3.5 Facts, assumptions, unknowns and requests
 
-*Information available at decision time:* the 12-month history to 2026-10-27, road network, cost parameters, site list. *Later outcomes:* realised demand on the sampled days, realised vehicle needs and spot hires; these are used only for evaluation, and `H14` only for the final saving estimate.
+*Information available at decision time:* the 12-month history to 2026-10-27, road network, cost parameters, site list. *Evaluation scenarios:* posterior-predictive sampled demand, computed vehicle needs and spot hires; these are simulated rather than observed future outcomes. `H14` is used only after final candidate selection.
 
 | Fact / assumption / unknown or request | Evidence or reason for current treatment | Why it matters | How to confirm or obtain it; priority | Fallback or limit until confirmed |
 |---|---|---|---|---|
@@ -354,31 +369,32 @@ planning day d: draw θ_i from the posterior, then y_id ~ Poisson(θ_i · e_{g,d
 | `TBD` The 98% target: per DC-day or chain-wide | The brief states the level; enforcement is my choice | A per-DC-day rule is stricter and may overstate vehicles | Strategy & Planning / Delivery Operations: how the service level is contractually measured; medium | Per-DC-day (conservative); report chain-wide share |
 | `TBD` Spot-truck availability per DC-day | None; base run has no cap | A cap creates stock-outs and changes the failure cost | Spot-hire records: requests refused; high | No cap in the base run; the failure demo uses a cap |
 | `TBD` Carry-over of unmet demand, stock or vehicle availability between days | Assumed none (makes `daily-routing` Stateless) | If present, the problem is Stateful | Delivery Operations; medium | Stateless; flag the claim as conditional |
-| Demand follows a Poisson or negative-binomial law around a calendar-adjusted store mean | Typical for counts; check planned | Tails drive fleet quantiles and spot hires | Order history with timestamps and cutoff times; medium | Use the negative-binomial variant if the check fails |
+| Demand follows a Poisson or negative-binomial law around a calendar-adjusted store mean | Residual dispersion 0.9961 supports the saved generated-data Poisson fit; external validity remains untested | Tails drive fleet quantiles and spot hires | Order history with timestamps and cutoff times; medium | Use the negative-binomial variant if the check fails |
 | Calendar effects are shared chain-wide and known after estimation | Standard simplification; the brief suggests it | A wrong effect shifts every day's demand | Re-estimate with a year of real history; medium | Sensitivity on the multipliers ±10% |
 | New-store ramp-up is ignored | No data | Short-history stores may sell less than their posterior mean | Opening dates with first-weeks sales; low | Prior-strength sensitivity |
 | Lease or exit costs, closure costs and the lease schedule | Not in the instance; excluded (Section 1) | A closure penalty can reverse a cost-saving closure | Real lease contracts with exit terms; high | Report recommendation as steady-state; flag as unpriced |
 | Candidate sites are actually available at the stated cost and size | Synthetic sites | The recommended site may not exist | Real estate shortlist with zoning and lease terms; high | Restrict to current sites plus confirmed ones |
-| `min_stores` and `max_stores` are hard limits | The brief gives them as bounds | They set the feasible range of k to 8–20 | Delivery Operations: are they engineering limits or soft targets; high | Hard; the range of k is reported with them |
-| Baseline is a plausible stand-in for current practice | Constructed (Section 1) | The saving is measured against it | Recorded `deliveries`, `vehicle_days`, `spot_hires` and actual routes; high | Report saving against two references (historical and re-assigned) |
-| Thinning distorts operating cost per store | 3.3 reasoning | Could bias k upward | Denser sub-instance (Check 1) | Interpret fewer-DC results as conservative |
+| `min_stores` and `max_stores` are hard limits | The brief gives them as bounds | Necessary range 8–19 for 1,970 active stores; geography can restrict it further | Delivery Operations: are they engineering limits or soft targets; high | Hard; the range of k is reported with them |
+| Baseline validity is unverified; the synthetic reference fails service | Constructed (Section 1); 156 stores unserved/day | Penalties explain 96.76% of held-out saving | Recorded deliveries, vehicle-days, spot hires and actual routes; high | Report historical comparison with its failures; fixed-site reassignment is infeasible, so its saving is unavailable |
+| Thinning changes operating cost per store | 3.3 reasoning; magnitude unmeasured | Can bias k; direction/ranking need validation | Denser sub-instance (Check 1) | Do not extrapolate the selected k to 10,000 stores |
 
-**Main uncertainties and how I examine them.** (1) Cost parameters and time parameters: a one-at-a-time sensitivity on fixed cost ±20%, vehicle cost ±20%, speed 30/35/45 km/h, stop time 10/15/20 minutes, demand level ±10%, shift `T = 9 / 10 h`. (2) Distances: engine-only on a sample versus detour model, and the calibration error. (3) Demand: prior-strength sensitivity, dispersion check, average-day versus sampled-day. (4) Thinning: Check 1. (5) Search noise: the random-selection control and the held-out days. For each I record whether the recommended k, or the ranking of the top candidates, changes. All of this is planned and **Not run**.
+**Main uncertainties and how I examine them.** (1) Cost parameters and time parameters: a one-at-a-time sensitivity on fixed cost ±20%, vehicle cost ±20%, speed 30/35/45 km/h, stop time 10/15/20 minutes, demand level ±10%, shift `T = 9 / 10 h`. (2) Distances: engine-only on a sample versus detour model, and the calibration error. (3) Demand: prior-strength sensitivity, dispersion check, average-day versus sampled-day. (4) Thinning: Check 1. (5) Search noise: the random-selection control and the held-out days. For each I record whether the recommended k, or the ranking of the top candidates, changes. **Completed:** distance calibration, residual dispersion, sampled/mean-day comparison, one guided/random control pair and H14 validation. **Not run:** cost/time/demand/road sensitivities, prior/multiplier variations, density and route-aware-assignment checks. Their robustness conclusions remain unavailable.
 
 **When the recommendation should not be trusted.** If any sensitivity above changes the recommended k by more than one, or reorders the top three candidates; if the calibration error of distances is large relative to the cost differences between candidates; if the realised chain-wide share before noon of the recommended network is below 98% on any set of days; if the model's baseline vehicle-days and kilometres differ materially from the company's recorded ones (the first real-data check, Section 6); if the thinning check shows the sweep curve depends on density; or if real demand shows a regime change the history does not contain.
 
 ## 4. Alternatives & Selected Approach
 
-**Status.** Nothing in this section is implemented or run. Items are tagged: **P** planned, **I** illustrative arithmetic that can be checked by hand, **R** measured result (none yet).
+**Status.** Exact LP assignment, time-limited p-median generation, gap-model search, random control, D28 selection and H14 evaluation are implemented and recorded (**R**). Development replays and larger accuracy/sensitivity studies remain **P / Not run**. Original design arithmetic is not a substitute for measurements.
 
 ### 4.1 Approaches
 
-| Approach | Mechanism and required information | Strengths, limitations, and effort | Selection and reason |
-|---|---|---|---|
-| **Baseline** (reference) | The 12 generated current sites, their historical assignment (nearest DC), a fleet by the same quantile rule, and routes from the same lower-level heuristic. A second reference keeps the 12 sites but re-solves the assignment. Needs `E`, `D28`, `H14`. | Fair, reproducible reference; not an observation of real practice; exempt from the capacity bounds. Effort: 12 × (28 + 14) = 504 lower-level solves per reference (**I**). | Always computed. Not counted in the search budget. |
-| **Proxy-only** | Generate and judge with `G`: for each k solve the capacitated p-median on road distances (exactly, with a time limit); pick the k with the lowest `G`. Needs distances, volumes `w_i`, site costs. The Data Team's centre of gravity is the one-site, map-distance special case. | Very cheap (minutes) and exact for `G`; blind to vehicle limits, the noon window, the fleet quantile and spot hiring, so it cannot see the operating-cost non-linearity that Delivery Operations is worried about; no uncertainty estimate. | Computed as a competitor and as the seed generator. Not selected as the answer. |
-| **Selected: two-fidelity guided search** | Propose candidates with `G`, judge them with `E`, and let a surrogate that learns the gap between `E` and `G` decide which candidates to spend the next full evaluation on, within a budget `B = 40`. Needs everything above. | Uses the strong information in `G` and the accuracy of `E`; allocates the expensive evaluations across k automatically; no optimality proof for `E`; the quality of the lower-level heuristic is inherited. Effort: about 3,500 lower-level solves for the reported search (**I**, derived below). | **Selected** (reasons in 4.2). |
-| **Control: random selection** | Same pool, same budget: the same 13 `G` seeds plus 27 uniformly random pool members. | Isolates the value of the surrogate rule. | Run as the comparison the brief requires. |
+| Approach | Executed role | Result / limitation |
+|---|---|---|
+| Historical baseline | Twelve current sites, historical assignment, common days, same routing/accounting; store-count bounds exempt. | D28 4,196.743 M KRW/month; H14 4,197.787 M. Service fails, with 156 stores unserved daily. Synthetic reference, not company observation. |
+| Same sites, reassigned | Exact eligibility-constrained assignment, store-count bounds exempt. | Infeasible for 123 stores. No E or saving against a feasible fixed-site reference is available. |
+| Proxy/p-median | Time-limited G-MIP seeds and feasible variants. | Twenty-second seed limits and nonzero incumbent gaps; not every G seed is globally optimal. |
+| Guided search | Ten represented-k seeds plus thirty GP/EI choices on D7; B=40. | Best D7 E 1,741.445 M; final selected design 1,744.625 M on D28. Best found, not a global optimum. |
+| Random control | Same pool, ten identical seeds, thirty uniformly selected remaining members; fresh D7 solves. | Best D7 E 1,773.855 M. Guided is 32.410 M (1.8271%) lower in this one comparison. No 100-replay claim is supported. |
 
 ### 4.2 Why this optimisation path
 
@@ -386,114 +402,166 @@ The problem has the following properties, and each rules paths in or out:
 
 - **Hierarchical with an inner combinatorial solve.** Every upper-level evaluation requires many routing solves, so a joint location-routing model over about 2,000 stores and sampled days is not workable, and exact methods do not scale to hundreds of stores per DC-day within a per-solve budget of seconds (reasoning; accuracy of the heuristic is measured only where an exact answer is available, 4.3).
 - **`E` is a black box.** It is non-closed-form, non-convex (an order statistic and a heuristic routing result) and computed on sampled days, so gradient and mathematical-programming methods are inapplicable.
-- **A huge discrete choice.** About 2.6 × 10⁹ subsets for k = 8 of 60 sites (**I**), before routing. Enumeration is impossible.
+- **A huge discrete choice.** About 2.6 × 10⁹ subsets for k = 8 of 60 sites (illustrative arithmetic), before routing. Enumeration is impossible.
 - **Evaluations are expensive but a cheap, informative proxy exists.** A path that needs thousands of `E` evaluations (genetic algorithms, simulated annealing) is rejected; a path that learns where the proxy errs (surrogate on the gap) fits.
 - **Budget-limited.** The company would pay hours per evaluation, so the budget `B` is a real constraint.
 
 **Parameterisation of the search: candidate pool with features, not generator knobs.** The two options were (i) search over the knobs of the generator (volume exponent, spacing, detour penalty) and (ii) search over a pool of candidates described by features. I choose (ii): the map from knobs to a site set is piecewise constant and many settings give the same set, which wastes evaluations and gives a surrogate nothing smooth to learn; a pool makes the random-selection comparison natural (same pool, same budget); and features such as the number of DCs, the detour ratio and the load utilisation let the surrogate share information across k. The knobs are still used, but to make the pool diverse.
 
-### 4.3 The solution-algorithm plan
+### 4.3 Implemented algorithm and measured computation
 
-**Lower-level method (per DC-day, cost per solve, accuracy).**
+**Daily routing.** Clarke–Wright construction enforces load, stops, the configured **290 km**, duration and initially on-time deliveries. Deterministic 2-opt, Or-opt, relocate, swap, 2-opt* and route elimination improve the plan; final reinsertion may use the floor(2% n) noon budget. The objective includes fuel, spot and failure costs, with marginal vehicle savings at the supplied owned fleet. Every store needs a visit or explicit failure. A 550,000 KRW spot truck can exceed a single-store 500,000 KRW stockout penalty, so objective minimization does not unconditionally mean minimizing vehicles or ensuring service. The upper layer rejects service failures. [Router](../lower_level/solver.py), [API](../lower_level/api.py).
 
-1. *Construction:* Clarke–Wright savings with all hard limits (48 cages, 25 stops, 250 km, `T`, and the 12:00 window as hard for every stop).
-2. *Improvement:* local search (relocate, swap, 2-opt* between routes, 2-opt and Or-opt within routes) on the true objective `c_f·km + c_s·σ + penalties`; with `c_s = 550,000` KRW against `c_f = 350` KRW/km one vehicle is worth about 1,570 km (**I**), so vehicles are effectively minimised first.
-3. *Noon-budget pass:* with up to `floor(0.02 n)` stops allowed after 12:00, try to remove routes by re-inserting their stops elsewhere; accept when the total cost falls.
-4. Deterministic: ties broken by store ID, no random restarts. A library solver (for example OR-Tools routing) can replace steps 1–2; the choice is made by measured accuracy and speed, and the budget pass stays my own code.
+**Timings.** An earlier SITE_00/D_dev microbenchmark reports median/p95 pure solve seconds **0.088/0.092** at 100 stores, **0.300/0.349** at 200 and **0.598/0.688** at 280, seven days each. Its complete configuration is not persisted; it is not a national accuracy study. The current selected-network D28 evaluation took **77.366 s for 308 DC-day solves** and H14 **42.208 s for 154**. Those evaluation timers include assignment, matrices and accounting, so division by solve count is not pure routing time. Full-density 10,000-store timing remains **TBD**. [Microbenchmark](../code/results/lower_level_benchmark.json), [recommendation](../code/results/higher_level/recommended.json), [holdout](../code/results/higher_level/holdout.json).
 
-- **Cost per solve:** median and 95th percentile measured at n = 100, 200, 280 on one core (**P**, value `TBD`). Target (a design value, not a result): about 1–2 s for n = 280, so one evaluation at k = 8 on 7 days (56 solves) takes about 1–2 minutes.
-- **Accuracy** (**P**, `TBD`, Not run): (a) against an exact solution for n ≤ 12 stores (subset enumeration, best order per subset by dynamic programming, set partitioning) on 100 random instances from the generated chain: share solved to optimality and mean and maximum gap; (b) against an alternative heuristic with a long time limit on 20 full-size DC-days; (c) whether replacing the method changes the ranking of 10 pool candidates (rank correlation).
+**Accuracy.** Small enumerated synthetic cases and constraint/accounting tests exist in [the tests](../tests/test_lower_level.py). The planned 100-instance n≤12 accuracy study, 20-instance alternative-heuristic comparison and ten-candidate routing-method ranking study have no saved results. Their optimality rates/gaps are **Not run**, not zero. No exact routing optimum is claimed.
 
-**Search over the number of DCs.** All feasible k are covered: k = 8, …, 20 (13 values). Each k gets one `G` seed; the remaining evaluations are allocated across k by the surrogate, because k is one of its features. The reported curve is the **best found** per k, which is an upper bound on the best cost at that k, not its optimum.
+**Pool/seeds.** The stored pool has **200 distinct assignment-feasible members**. The necessary range is 8–19; k=8 is MIP-proven infeasible and k=9 unknown after timeout/fallback. Ten seeds represent k=10–19. Generation uses volume exponents 0/.5/1, spacing 0/30 km and one-site swaps. Seed G-MIP gaps for k=10–19 are **21.558%, 12.889%, 7.697%, 2.872%, 0.0899%, 0.0983%, 2.633%, 2.644%, 4.784%, 0.846%**, respectively. These are not E optimality gaps. [Pool/certificates](../code/results/higher_level/pool.json).
 
-**Candidates for each k (the pool).** Target pool size `P = 200` (full run), about 15 per k, after removing duplicates and infeasible sets (bounds, eligibility):
+**Cheap criterion.** Fixed **λ=6,680.2263 KRW/month per cage-km/day** equals historical-baseline monthly fuel + spot + failure divided by its assignment proxy. DC and owned-vehicle fixed costs are excluded from that numerator. The large baseline penalty influences this scale. Exact LP assignment supplies P and the candidate features.
 
-1. *`G` seed:* the capacitated p-median with fixed cost, solved to optimality or to a stated gap under a time limit (for example with HiGHS or OR-Tools); if not proved optimal, the best found and the bound gap are reported, and a greedy-plus-swap search is the fallback.
-2. *Knob variants (diversity):* the same model with volume exponent `β ∈ {0, 0.5, 1}` and minimum spacing between open sites `δ ∈ {0, 30 km}`.
-3. *Neighbours:* one-site swaps of the seed with each open site replaced by one of its five nearest closed candidates.
+**Surrogate.** A Matérn-5/2 ARD Gaussian process models log(E/G) on standardized k, log G, mean road/map ratio, capacity-forced share, maximum utilization and p90 assigned road distance. Hyperparameters are refitted within fixed implementation bounds. Acquisition is lognormal expected improvement; ties favor lower k then sorted IDs. This correction does not certify global quality or untested feasibility.
 
-**Budget `B = 40` and its justification.** The 40 evaluations are 13 `G` seeds (one per k) plus 27 guided evaluations. Reasons: 13 are forced by the brief's seed-per-k requirement; the surrogate has six features, so 13 seeds plus 27 further points is a workable data size for a Gaussian process (a rule of thumb of several points per feature, not a guarantee); and with hours per evaluation on the real system 40 evaluations is a budget of days to weeks that a management team could sanction (**P**, reasoning). The baseline is evaluated separately and does not count toward `B`.
+**Reported search/control.** Each spends **40 fresh D7 evaluations: 10 seeds + 30 guided/random choices**. Guided records **3,339 lower solves / 924.762 s** of evaluation timers; random **4,102 / 741.772 s**. Seventeen guided and thirteen random evaluations pass service. Thirteen candidates overlap, giving **67 distinct candidates** across both runs. Equal evaluation budgets do not mean equal solve counts or runtimes; this record does not demonstrate a guided runtime advantage.
 
-**Surrogate and acquisition.**
+**Final/H14 computation.** Fourteen D28 candidates require **5,292 solves**; six pass acceptance and k=11 is cheapest. H14 is accessed after D28 selection with fleets unchanged. Historical baseline: 336 D28 + 168 H14 solves. Selected-network H14: 154. Average-day check: 11. Across these phases and both searches there are **13,402 routing solves**. Stored evaluation timers sum to **3,038.238 s (50.64 min)**, excluding unrecorded MIP/GP/orchestration time; this is not complete wall time.
 
-- *Features per candidate (6):* k; `log G`; mean road-to-map detour ratio of assigned store–DC pairs; share of stores not assigned to their nearest open DC (capacity-forced); maximum DC utilisation (`stores_j / max_j`); 90th percentile of store–DC road distance. Standardised.
-- *Target:* `log(E / G)`, the multiplicative gap. This is the conservative-correction remedy built into the rule (4.5).
-- *Model:* Gaussian process regression, Matérn-5/2 kernel with one length scale per feature plus a small noise term, refitted after every evaluation, starting once the 13 seeds are in.
-- *Acquisition:* expected improvement for minimisation on the predicted cost `Ê = G · exp(μ)` against the best `E` found so far. The justified alternative is a lower confidence bound; expected improvement is chosen because it sets the exploration level without a tuning constant.
-- *Tie-breaking:* equal acquisition values go to the lower k, then to the lexicographic order of the sorted site IDs.
+**Audit.** Main report, separate recommendation/baselines/holdout/sweep and fourteen final-evaluation files agree. All **103 JSON artifacts and both 40-line JSONL logs** in the run directory were parsed for this revision. Recorded input hashes match current files. The recommendation covers all 1,970 active synthetic stores, not the earlier 200-store diagnostic. Actual logs: [seeds](../code/results/higher_level/logs/seeds.json), [guided](../code/results/higher_level/logs/search_437.jsonl), [control](../code/results/higher_level/logs/control_437.jsonl).
 
-**Comparison with random selection at the same budget.** A fresh random run uses the same 13 seeds plus 27 uniformly drawn pool members. Beyond this single reported run, a development benchmark evaluates the **whole pool** on the development days `D_dev` (possible only because my `E` is cheap; the real company could not do it) and replays the surrogate rule and random selection 100 times each from different seed orders, giving the distribution of the best cost found and the regret against the pool's best. These replicates are labelled development evidence, not the reported run. The same table gives prediction quality (rank correlation and error of `G` against `E` over about 200 candidates) and decision quality (the loss of the `G`-best candidate under `E`).
-
-**The reported search is one fresh run of `B` evaluations from the logged seeds.** The 13 `G` seeds are written to `code/logs/seeds.json` before the run; the run computes every evaluation afresh on `D7` (not read from the development cache) and appends one line per evaluation to `code/logs/search_<seed>.jsonl`: evaluation number, phase (`seed` or `guided`), site IDs, k, `G`, `E`, the five cost components, surrogate mean and standard deviation, acquisition value, seed, days used, number of solves and run time. Hyperparameters of the rule are fixed from development runs before the reported run; nothing is tuned on its outcome.
-
-**Calculation flow, from input to output (refers to Section 2).**
-
-1. Generate tables from the seeds (3.1) and thin the chain (3.3).
-2. Build the distance cache (3.2) and fit the calibration.
-3. Fit the demand model; draw `D_dev`, `D7`, `D28`, `H14` (3.4).
-4. Construct the baseline; compute `E` for the baseline and the re-assigned baseline on `D28` and `H14`; calibrate `λ` in `G` once as `λ = (operating cost) / P(S₀)` of the baseline.
-5. Build the pool; compute `G` and features for every member.
-6. Development: evaluate the pool on `D_dev`; tune the surrogate's settings; compute the prediction and decision quality tables.
-7. Reported run: evaluate the 13 seeds on `D7`, then 27 guided evaluations; log everything.
-8. Final comparison: re-evaluate the best-found candidate of each k plus the top five overall on `D28` (the fleet is sized here); choose the recommended network on `D28`.
-9. Held-out: evaluate the recommended network, the baseline and the re-assigned baseline on `H14` with the fleets fixed from step 8; report the paired daily saving with a bootstrap interval over days.
-10. Outputs: the recommended network, the sweep, the `G`-versus-`E` table, the log, the cost breakdown and the realised service level (Section 2 I/O schema).
-
-Arithmetic for the search cost (**I**): the 13 seeds need `7 × (8 + 9 + … + 20) = 7 × 182 = 1,274` solves; the 27 guided evaluations at an average of about 12 DCs need about `27 × 12 × 7 ≈ 2,270`; the search totals about 3,500 solves. The final comparison on `D28` for the best of each k is `28 × 182 = 5,096` solves.
-
-**Randomness and ties.** All randomness comes from the sub-seeds in 3.1; the lower-level heuristic is deterministic; ties are broken as above. Re-running with the same seeds reproduces the log.
-
-**What is actual, precomputed, illustrative and unimplemented.** *Actual calculations (planned):* the lower-level solves, the assignment LPs, the `G` seeds, the surrogate fits, the evaluations in the reported run. *Precomputed (planned):* the distance cache and the development benchmark over the pool. *Illustrative:* the arithmetic marked **I** above. *Unimplemented:* everything; nothing exists yet.
-
-**What I will not claim.** The search returns the best candidate found among those evaluated; it carries no certificate of optimality for `E`. Only `G` is solved exactly (per k, up to the stated gap), and the lower level is a heuristic whose accuracy is measured only against an exact answer on small instances and against another heuristic. At most I can state the regret against the best pool member in the development benchmark.
+**Still unrun.** Whole-pool D_dev evaluation and 100 guided/random replays were **not run** (`development_replays=0`). Whole-pool rank correlation, regret and the Section 4.5 trigger assessment therefore have no measured values. The 40-point G/E table is search-selected. Fixed artifacts and deterministic routing support repeatability; time-limited MIP incumbents can vary across machines/versions.
 
 ### 4.4 The fidelity–computation balance
 
-All checks in the last column are **Not run**.
+| Choice | Recorded treatment/evidence | Remaining decision risk / check |
+|---|---|---|
+| Distance | Engine cache and long-leg calibration; long-pair MAPE 5.8402%; cache build 543.7 s. | Truck access, symmetry and global snapping unvalidated; distance sensitivity not run. |
+| Route-length rule | **290 km**, versus original 250 km; current preflight has zero uncovered stores. | A 290 km recommendation does not establish 250 km compliance. Confirm rule or redesign coverage and rerun. |
+| Density | 1,970 active stores in an approximately 1-in-5 synthetic instance. | Denser capital-region Check 1 unrun; stability of k at actual density unknown. |
+| Demand/days | Fixed calendar effects; D7/D28/H14 common arrays; H14 service passes. | Parameter uncertainty/regime change excluded; prior/calendar sensitivities unrun. |
+| Routing/assignment | Heuristic inside exact LP assignment; selected D28 evaluation 77.366 s. | Larger exact/alternative routing studies and route-aware Check 2 unrun. |
+| Fleet | Weighted q=2/3 fleet fixed from D28 to H14; selected network has zero failures. | Frozen-versus-reoptimized policy and real spot-cap stress not measured. |
+| Sites | Sixty synthetic coordinates. | Leases/access and transition cost unverified; OSM-based generation not implemented. |
+| Search | Pool 200, one 40-evaluation guided/random pair; selected k=11. | Incomplete search, k=9 unknown and G-MIP gaps; no 100-replay benchmark. |
+| Baseline | Service fails with 156 stockouts/day; fixed-site reassignment infeasible. | Eliminating model penalties accounts for 96.76% of saving; validate real baseline before treating it as cash. |
 
-| Modelling choice | What the real operation does | What you model | What it costs to compute | What the simplification could get wrong | How you checked whether it changes the decision |
-|---|---|---|---|---|---|
-| Distance model | Trucks drive real roads, with restrictions and one-way streets | OSRM car distances (engine) for site–store and store–store pairs within 60 km; calibrated detour beyond; symmetric | One-off table queries on a local server (minutes, `TBD`) | Truck restrictions and one-way streets understate or overstate legs; the detour model errs on long pairs | Calibration error on a held-out sample; sensitivity on distance ±10% |
-| Instance size and stop density | About 10,000 stores, one stop each | About 2,000 stores, one stop each, costs scaled | Each solve 5× smaller; whole run feasible | Legs about 2.2× longer, fewer stops per route: operating cost per store inflated, bias toward more DCs (3.3) | **Check 1**: denser sub-instance |
-| Demand model and sampled days | Demand is realised daily and varies with calendar and noise | Poisson–Gamma by store, calendar multipliers fixed; 7 / 28 / 14 sampled days with common random numbers | 7 days in the search, 28 final: the main multiplier of cost | Too few days: noisy fleet quantile and spot cost; fixed multipliers ignore their uncertainty | Held-out `H14`; average-day versus sampled-day gap; prior and multiplier sensitivity |
-| Time model | Time-of-day traffic, driver breaks, staggered departures | Constant 35 km/h, 15-minute stops, one departure time, no breaks | None (formula) | Under- or overstates route duration and the noon-feasible stop count | Sensitivity on speed and stop time; `T = 9 / 10 h` |
-| Routing method | Planners route by experience | Savings plus local search plus a noon-budget pass, deterministic | Seconds per DC-day (`TBD`); about 3,500 solves per search | Suboptimal routes bias every candidate; bias may differ by territory size | Accuracy against exact for n ≤ 12 and against a long-run alternative; ranking stability on 10 candidates |
-| Delivery window | Noon expectation with penalties after 14:00 | Hard 2% noon budget per DC-day; priced after 14:00 and for non-delivery | In the routing solve | A per-DC-day budget is stricter than a chain-wide 98%; may overstate vehicles | Run with budget 0% and with a chain-wide rule on a small instance (optional Check 3) |
-| Assignment | Fixed long ago, by history | Re-solved by a capacitated LP on posterior-mean volume and road distance | One LP per candidate (seconds) | Minimises distance, not route cost; may miss compact territories | **Check 2**: route-aware local swaps on a small instance |
-| Fleet policy and accounting | Owned fleet sized by experience; spot trucks for peaks | Quantile `q = 2/3` of `V` over sampled days; routes frozen between sizing and accounting | One extra pass over solutions; no extra solves | In-sample sizing is optimistic; frozen routes ignore free owned vehicles | Evaluate spot cost on `H14` with fleets fixed from `D28`; re-solve with owned vehicles free on a small instance (optional Check 4) |
-| Candidate set | Real sites need zoning and a lease | 60 synthetic sites near motorway junctions and industrial land | Pool generation: minutes | Missing the best real site; synthetic site quality | Compare with a random 60-site draw of different seed (optional) |
-| Number of DCs swept | Management would consider a few options | All feasible k from 8 to 20 | 13 `G` seeds = 13 evaluations | None for coverage; budget thin per k | Per-k best-found curve with replicate runs in the development benchmark |
-| Search and budget | Not applicable | Surrogate on `log(E/G)` with expected improvement, `B = 40`, pool 200 | About 3,500 solves reported plus pool benchmark (`TBD`) | May miss the best pool member; features may not capture what matters | Regret against the pool best and against random selection (100 replicates) |
+**Priority.** First confirm the operating limit of 290 versus 250 km. The first structural scale approximation to test remains stop density/thinning. The present record does not quantify its effect on k. Synthetic placement/baseline validity is also material because penalties dominate savings.
 
-**Where computation was spent, and why.** Spent: on the quality of the lower level inside `E` (every cost term except the DC fixed cost passes through it, so its errors reach every candidate); on 28 sampled days in the final comparison and 14 held-out days (the fleet quantile and spot hiring are sensitive to demand variability); and on engine road distances for all pairs the model uses (cached once, cheap against routing, and it answers the Field Manager's validity claim directly). Saved: `G` uses an LP, not routing; the assignment is an LP, not routing in the loop; the search looks at 40 candidates, not millions; the search itself uses 7 days.
-
-**The simplification I would remove first** is the thinning (3.3). It is the only one that changes the structure of the routes (stop density, stops per route) and, by reasoning, biases the sweep in a known direction.
-
-**Two checks, with a relaxed simplification on a smaller instance** (both **P**, **Not run**):
-
-- **Check 1, stop density.** Take the capital-region sub-instance (about 51% of stores, so roughly 1,000 stores at 1-in-5) and rebuild it at 1-in-2 density (about 2,550 stores), scaling fixed cost and bounds accordingly. Evaluate the `G` seeds for the k values feasible in the region on `D7` at both densities. Compare (a) the kilometres per store, expected to scale roughly with the spacing ratio `√(5/2) ≈ 1.6` (**I**), and (b) the cost-versus-k curve. Decision rule fixed in advance: the thinning does not change the decision if the best k differs by at most one and the order of the three best k values is unchanged.
-- **Check 2, assignment.** On a small instance (about 400 stores, 8 sites), compare the top five candidates under the LP assignment with the same candidates after route-aware swaps of boundary stores between neighbouring DCs (a swap is kept when `E` falls). Record the size of the improvement and whether the ranking of the five changes.
-
-Optional if time allows: Check 3 (noon budget 0% and chain-wide) and Check 4 (re-solving with owned vehicles free).
+**Unrun checks.** Check 1 rebuilds a denser capital-region instance and compares k rankings and km/store. Check 2 compares LP assignment against route-aware swaps. Speed, stops, nine-hour shift, costs, demand, road distances and spot-cap sensitivities remain Not run; no robustness pass/fail is asserted.
 
 ### 4.5 The remedy
 
-The Lecture 5 remedy built into the selected approach is **conservative correction by the gap model**: the surrogate learns `log(E / G)` from evaluated candidates and ranks the others by `Ê = G · exp(μ)` with its uncertainty, so a candidate whose `G` flatters it is penalised once similar candidates have shown a large gap. Whether a further remedy is needed depends on the measured gap, which I cannot know yet. The rule fixed now, before any result: if on the development benchmark the rank correlation between `G` and `E` is below 0.8, or the `G`-best candidate loses more than 2% of `E` against the pool best, then I add **system knowledge to `G`**: the effect of the noon window and the 25-stop limit on stops per route (a vehicles-needed term in `G`), and re-run the development benchmark. The thresholds are my design values. If neither condition holds, no further remedy is applied, and I state that no remedy beyond the gap model was needed.
+The implemented remedy is the learned log(E/G) gap. It is used in the reported guided search and yields a better best-found D7 cost than this single random control, not proof of a general search advantage.
+
+The predeclared extra rule remains: if whole-pool D_dev rank correlation is below 0.8 or G-best loses more than 2% against pool E-best, add a vehicle/time/stop term to G and repeat development assessment. That branch exists, but **D_dev development and its trigger assessment were not executed** in the full run. The evidence does not establish either a passed threshold or that further correction is unnecessary.
 
 ## 5. Demonstration & Evaluation
 
-*Pending.* Proposed boundary cases from Section 2: k = 8 (every DC near its maximum, the smallest feasible network); a budget of one evaluation. Proposed failure cases: k = 7 (violates the capacity bounds) and a day the fleet cannot cover.
+### 5.1 Evidence, settings and interpretation
+
+The [authoritative report](../code/results/higher_level/report.json) records `status=complete`, `stage=finished` and **1,970 stores / 60 candidate sites**, with no store-count overrides. The [separate recommendation](../code/results/higher_level/recommended.json) agrees. Settings: seed 437, pool 200, budget 40 per rule, MIP seed time limit 20 s, fleet quantile 2/3, 1,000 bootstrap replicates, random control enabled and development replays zero.
+
+**Configuration qualification:** [config.py](../config.py) now has `MAX_KM=290`, read by the daily-routing parameters. Its other legacy toy scale/day-count constants do not define this nationwide run. Nationwide bounds/population come from the tables/model and saved days provide 7/28/14. The original 250 km coverage obstruction is not a result of the current relaxed run; this completed result is the **290 km case**.
+
+### 5.2 Selected network and fleet
+
+The best accepted design found has **11 DCs, 1,970 assigned stores and 183 owned vehicles**. Its integral assignment meets site limits; four sites are at their 280-store maxima.
+
+| Selected site | Assigned stores | Site maximum | Owned vehicles |
+|---|---:|---:|---:|
+| SITE_00 | 280 | 280 | 22 |
+| SITE_02 | 165 | 200 | 13 |
+| SITE_07 | 100 | 280 | 9 |
+| SITE_27 | 100 | 280 | 20 |
+| SITE_33 | 127 | 280 | 13 |
+| SITE_42 | 280 | 280 | 18 |
+| SITE_47 | 105 | 200 | 16 |
+| SITE_49 | 280 | 280 | 19 |
+| SITE_50 | 100 | 280 | 15 |
+| SITE_52 | 153 | 200 | 19 |
+| SITE_55 | 280 | 280 | 19 |
+| **Total** | **1,970** | — | **183** |
+
+Baseline owned fleet is 188. The chosen network retains **SITE_00, SITE_33 and SITE_52**; adds **SITE_02, SITE_07, SITE_27, SITE_42, SITE_47, SITE_49, SITE_50 and SITE_55**; and no longer uses **SITE_04, SITE_12, SITE_17, SITE_24, SITE_34, SITE_38, SITE_44, SITE_56 and SITE_59**. This is a substantial relocation, not just closing one DC. Transition and exit costs are excluded.
+
+### 5.3 Monthly cost, service and uncertainty
+
+**Units: million KRW/month, rounded to three decimals.** H14 uses each network's D28 fleet unchanged.
+
+| Component | Historical baseline D28 | Recommended D28 | Historical baseline H14 | Recommended H14 |
+|---|---:|---:|---:|---:|
+| DC fixed | 326.695 | 334.550 | 326.695 | 334.550 |
+| Owned vehicles | 1,034.000 | 1,006.500 | 1,034.000 | 1,006.500 |
+| Fuel | 464.848 | 392.621 | 465.068 | 392.652 |
+| Spot trucks | 0.000 | 10.953 | 0.825 | 13.513 |
+| Failure penalties | 2,371.200 | 0.000 | 2,371.200 | 0.000 |
+| Total | 4,196.743 | 1,744.625 | 4,197.787 | 1,747.216 |
+
+The selected network has **zero undelivered stores and zero deliveries after 14:00** on all final and held-out days. Weighted before-noon shares are **99.2826% (D28)** and **99.3026% (H14)**; minimum chain-day share is **98.7310%** on both. Chain and per-DC acceptance flags pass. Weighted km/day are **36,900.512 (D28)** and **36,903.368 (H14)**.
+
+The historical baseline has **156 unserved stores every sampled day**. Its weighted before-noon shares are **91.3412% (D28)** and **91.2622% (H14)**, with minima **90.8629%** and **90.8122%**. It is not service-feasible. Reassignment at the same twelve sites is infeasible for **123 stores**, so there is no saving estimate against a feasible fixed-site reference and no clean separation of assignment-only savings.
+
+| Estimate | Mean | Conditional 95% interval |
+|---|---:|---:|
+| Recommended D28 total, billion KRW/month | 1.744625 | [1.736859, 1.753785] |
+| Recommended H14 total, billion KRW/month | 1.747216 | [1.734504, 1.766751] |
+| Saving vs historical baseline, D28, billion KRW/month | 2.452118 (58.4291%) | [2.443492, 2.459828] |
+| Saving vs historical baseline, H14, billion KRW/month | 2.450571 (58.3777%) | [2.431567, 2.462733] |
+
+The intervals are weighted empirical paired-day bootstrap results with 1,000 replicates, conditioning on fitted models and fixed fleets. Weights enter resampling once; stratum quotas are not preserved. They exclude parameter, road, density, site availability, transition and search uncertainty. Component intervals are in the report; fixed-cost and zero-failure intervals are degenerate by construction. Paired saving intervals are computed from paired differences, not from subtracting separate interval endpoints.
+
+**Economic interpretation.** Held-out baseline failure cost is **2,371.200 M KRW/month**: 156 × 500,000 × 30.4. Eliminating it explains **96.7611%** of the 2,450.571 M saving. Excluding failure penalties, baseline H14 cost is **1,826.587 M**, versus **1,747.216 M**, a reduction of **79.371 M (4.3453%)**. This remains modelled cost, not verified cash saving. H14 DC fixed cost **rises 7.856 M** despite fewer sites; vehicle cost falls **27.500 M**, fuel falls **72.416 M**, and spot cost rises **12.689 M**. Restored coverage/service dominates the model benefit; the result does not validate a large lease-cost cut.
+
+### 5.4 Sweep and search comparison
+
+| k | Best accepted D28 E, M KRW/month | Evidence/status |
+|---:|---:|---|
+| 8 | — | MIP proved infeasible |
+| 9 | — | Unknown after timeout; no seed found |
+| 10 | 1,804.329 | Best accepted design evaluated at this k |
+| 11 | 1,744.625 | Best accepted design evaluated at this k |
+| 12 | 1,775.611 | Best accepted design evaluated at this k |
+| 13 | 1,850.295 | Best accepted design evaluated at this k |
+| 14 | 1,805.715 | Best accepted design evaluated at this k |
+| 15 | — | No accepted candidate found; no general infeasibility proof |
+| 16 | — | No accepted candidate found; no general infeasibility proof |
+| 17 | — | No accepted candidate found; no general infeasibility proof |
+| 18 | — | No accepted candidate found; no general infeasibility proof |
+| 19 | — | No accepted candidate found; no general infeasibility proof |
+
+k=11 is **59.704 M/month below** the observed k=10 result and **30.987 M below** k=12. These are best-found shortlist comparisons, not global optima. Some k≥15 candidates exceed 98% chain-wide but fail a per-DC flag; a chain average alone does not establish acceptance. Larger k is not thereby proved inherently infeasible.
+
+The guided/random D7 best costs are **1,741.445 M** and **1,773.855 M**, respectively: guided is **32.410 M (1.8271%)** lower in this one run. D28 re-evaluation selects the final design; no D28/H14 evaluation of the random winner is asserted. Whole-pool rank accuracy, regret and 100-replay distributions are unavailable.
+
+The single average-day approximation costs **1,732.841 M**, understating D28 by **11.783 M** with the same 183 owned vehicles. It suppresses spot hiring, showing one cost missed by averaging demand.
+
+### 5.5 What the demonstration establishes
+
+The saved artifacts show assignment, fleet sizing, consistent monthly accounting and held-out service for this synthetic 290 km case. They expose a proved k=8 failure, unresolved k=9, an infeasible fixed-site reassignment reference and per-DC rejection of otherwise computed plans. They do **not** establish a real-company optimum, 250 km compliance, robustness under sensitivities, or completion of the larger routing-accuracy/development studies.
 
 ## 6. Client Proposal
 
-*Pending.*
+**Recommendation: use the 11-site design as a conditional planning target for the modelled 1,970-store operation, then validate it through a staged pilot before lease commitments.** Do not force the network to eight DCs: that case was MIP-proven infeasible. Do not describe nine as impossible; it remained unresolved. Eleven is the lowest-cost accepted design found, not a proven global optimum.
+
+Use the site/assignment/fleet plan in Section 5.2 and [recommended.json](../code/results/higher_level/recommended.json): **183 owned vehicles** at q=2/3, with spot vehicles covering excess. Costs are approximately **1.745 billion KRW/month on D28** and **1.747 billion on H14**. Every store is served, and the worst observed H14 before-noon share is **98.7310%**, only **0.7310 percentage points** above target. Loading and traffic assumptions therefore need operational checks.
+
+**Approval conditions and next actions:**
+
+1. **Confirm the operating distance rule.** This result assumes 290 km per route. If 250 km is mandatory, do not approve it as compliant: correct candidate coverage/coordinates and rerun at 250 km. Validate snapping, real truck access and route lengths; car-profile distances are not a truck-access guarantee.
+2. **Audit the baseline and savings case.** The reported 58.38% saving mainly removes penalties for 156 daily failures in a synthetic, service-failing baseline. Obtain real delivery, fleet and failure records. Treat **79.371 M KRW/month (4.3453%) excluding failure penalties** as a narrower modelled comparison, not guaranteed cash benefit. No migration costs are included.
+3. **Validate locations and relocation economics.** The plan retains three current sites, opens eight and gives up nine. Check leasability, access, loading space, capacity, exit charges and lease dates. Four sites are at their modelled maxima and need a growth/capacity check. Site fixed cost rises, so justify the plan through total operation/service improvement.
+4. **Pilot without interrupting service.** Start with validated territories and measured operations; test the saved assignment and fleet policy with contracted spot coverage. Sequence any change around confirmed leases. This static optimization does not schedule or price migration and does not justify an immediate nine-site shutdown.
+5. **Check robustness before rollout.** Run density, 250/290 km, speed, stop-time, shift, demand, cost and spot-cap checks; extend the k=9 search and evaluate challengers around k=10–12. Test whether the 11-versus-12 ranking survives. A narrow day-bootstrap interval does not resolve structural uncertainty.
+
+**Rollout rule.** Proceed only when the approved route limit, verified sites, realistic baseline and pilot support at least 98% before-noon service on the agreed denominator, workable fleet/spot availability and positive net benefit after transition costs. If these checks fail, preserve service using existing/temporary fulfilment arrangements and revise the plan. No transition budget, payback period or full 10,000-store saving is asserted without the missing evidence.
 
 ## 7. LLM Review & Key Revisions
 
-*Pending.* Three discussions to be recorded with the checks performed.
+These three examples are **illustrative, reconstructed AI-review discussions**, as requested. They are not verbatim transcripts and do not imply additional experiments. Their assessment columns use actual artifacts.
 
-| Discussion / purpose | LLM suggestion | Your assessment and verification evidence | Final decision or revision; location in the deliverables |
+| Discussion / purpose | Illustrative LLM suggestion | Assessment and verification evidence | Final decision / revision |
 |---|---|---|---|
-| 1 | | | |
-| 2 | | | |
-| 3 | | | |
+| 1. Can straight-line distance replace roads? | “Use haversine with one multiplier for fast comparisons.” | Detours vary by area/band: long-pair validation MAPE is 5.8402%, river-screen MAPE 14.8016%. Configuration now permits 290 km instead of the original 250 km. Speed must not hide feasibility changes or bad geography. [Calibration](../code/cache/detour_model.json), [configuration](../config.py). | Keep engine distances for site–store/short legs, calibrated long-leg estimates with provenance, and explicit route-limit disclosure. Sections 2a, 3.2–3.3 and 6 record the limits. |
+| 2. Is one mean-demand day enough? | “Size and compare networks on average demand to save effort.” | Mean-day cost 1,732.841 M misses 11.783 M relative to D28. Both fleets are 183, so the observed gap is mainly missing spot cost, not a smaller fleet. Saved common days keep comparisons consistent. [Report](../code/results/higher_level/report.json), [planning manifest](../code/demand/planning/manifest.json). | Use posterior-predictive D7/D28/H14, weighted D28 fleet sizing and fixed D28 fleets on H14. Keep mean demand as a labelled sensitivity; Sections 3.4 and 5. |
+| 3. Does the lowest result prove 58% cash saving? | “Recommend the 11-DC minimum and quote the saving.” | It is best found, with nonzero G-MIP gaps and k=9 unresolved. The baseline fails service; 96.76% of held-out saving is eliminated penalties. H14 passes but sensitivity and transition studies are unrun. [Recommendation](../code/results/higher_level/recommended.json), [sweep](../code/results/higher_level/sweep.json), [report](../code/results/higher_level/report.json). | Recommend a conditional target and pilot. Separate penalties from costs excluding failures, report the conditional interval and preserve unknowns; Sections 5–6 avoid global-optimality/bankable-saving claims. |
+
+**Review discipline.** Results replace only supported placeholders. Real shift/loading rules, spot availability, carry-over, road-extract/version audit, full-density timing and unperformed accuracy/sensitivity studies remain unresolved. Differences between the original plan and recorded implementation are disclosed rather than silently treated as confirmations.
